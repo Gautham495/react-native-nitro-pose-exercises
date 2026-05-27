@@ -1,15 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import {
-  Camera,
   useCameraDevice,
   useCameraPermission,
-  useFrameOutput,
-  useAsyncRunner,
 } from 'react-native-vision-camera';
-import { SkiaCamera } from 'react-native-vision-camera-skia';
-import { Skia } from '@shopify/react-native-skia';
-import { SwitchCamera, Layers } from 'lucide-react-native';
+import { SwitchCamera } from 'lucide-react-native';
 import {
   nitroPoseExercises,
   PUSHUP_CONFIG,
@@ -18,63 +13,20 @@ import {
   type SessionResult,
   type ExercisePhase,
 } from 'react-native-nitro-pose-exercises';
+import { NormalCameraView } from './normal';
 
-// ─── Skeleton Drawing Config ─────────────────────────────────
-const SKELETON_CONNECTIONS: [number, number][] = [
-  // Face
-  [0, 1],
-  [1, 2],
-  [2, 3],
-  [3, 7],
-  [0, 4],
-  [4, 5],
-  [5, 6],
-  [6, 8],
-  [9, 10],
-  // Torso
-  [11, 12],
-  [11, 23],
-  [12, 24],
-  [23, 24],
-  // Left arm
-  [11, 13],
-  [13, 15],
-  // Right arm
-  [12, 14],
-  [14, 16],
-  // Left leg
-  [23, 25],
-  [25, 27],
-  // Right leg
-  [24, 26],
-  [26, 28],
-  // Hands
-  [15, 17],
-  [15, 19],
-  [15, 21],
-  [16, 18],
-  [16, 20],
-  [16, 22],
-  // Feet
-  [27, 29],
-  [27, 31],
-  [28, 30],
-  [28, 32],
-];
-
-const KEY_LANDMARKS = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+// ─── Skia Camera (commented out — uncomment to enable skeleton overlay) ───
+// import { SkiaCameraView } from './skia';
 
 type AppPhase = 'setup' | 'countdown' | 'active' | 'results';
 
 export default function App() {
   const { hasPermission, requestPermission } = useCameraPermission();
-  const asyncRunner = useAsyncRunner();
 
   // ─── Camera State ───────────────────────────────────────────
   const [cameraPosition, setCameraPosition] = useState<'front' | 'back'>(
     'front'
   );
-  const [useSkia, setUseSkia] = useState(false);
   const device = useCameraDevice(cameraPosition);
 
   // ─── App State ──────────────────────────────────────────────
@@ -153,10 +105,6 @@ export default function App() {
     setCameraPosition((prev) => (prev === 'front' ? 'back' : 'front'));
   }, []);
 
-  const toggleSkia = useCallback(() => {
-    setUseSkia((prev) => !prev);
-  }, []);
-
   // ─── Start Session ──────────────────────────────────────────
   const startSession = useCallback(() => {
     if (!isInitialized) return;
@@ -195,23 +143,6 @@ export default function App() {
     setAppPhase('setup');
   }, []);
 
-  // ─── Normal Camera Frame Processor ─────────────────────────
-  const frameOutput = useFrameOutput({
-    pixelFormat: 'rgb',
-    onFrame(frame) {
-      'worklet';
-      const accepted = asyncRunner.runAsync(() => {
-        'worklet';
-        try {
-          nitroPoseExercises.processFrame(frame);
-        } finally {
-          frame.dispose();
-        }
-      });
-      if (!accepted) frame.dispose();
-    },
-  });
-
   // ─── Render Guards ──────────────────────────────────────────
   if (!hasPermission) {
     return (
@@ -235,107 +166,23 @@ export default function App() {
   // ─── Render ─────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Camera — Normal or Skia */}
-      {useSkia ? (
-        <SkiaCamera
-          style={StyleSheet.absoluteFill}
-          isActive={appPhase !== 'results'}
-          device={cameraPosition}
-          pixelFormat="rgb"
-          onFrame={(frame, render) => {
-            'worklet';
-            try {
-              nitroPoseExercises.processFrame(frame);
+      {/* Camera */}
+      <NormalCameraView device={device} isActive={appPhase !== 'results'} />
 
-              const landmarks = nitroPoseExercises.landmarks;
-
-              render(({ frameTexture, canvas }) => {
-                // Draw camera frame
-                canvas.drawImage(frameTexture, 0, 0);
-
-                // Draw skeleton overlay
-                if (landmarks && landmarks.length > 0) {
-                  const w = frame.width;
-                  const h = frame.height;
-
-                  // Draw bones (connections)
-                  const linePaint = Skia.Paint();
-                  linePaint.setColor(Skia.Color('#00FF00'));
-                  linePaint.setStrokeWidth(4);
-                  linePaint.setStyle(1);
-
-                  for (const [i, j] of SKELETON_CONNECTIONS) {
-                    if (i < landmarks.length && j < landmarks.length) {
-                      const a = landmarks[i];
-                      const b = landmarks[j];
-                      if (a && b) {
-                        if (a.visibility > 0.5 && b.visibility > 0.5) {
-                          canvas.drawLine(
-                            a.x * w,
-                            a.y * h,
-                            b.x * w,
-                            b.y * h,
-                            linePaint
-                          );
-                        }
-                      }
-                    }
-                  }
-
-                  // Draw joints
-                  const jointPaint = Skia.Paint();
-                  jointPaint.setColor(Skia.Color('#FF0000'));
-                  jointPaint.setStyle(0);
-
-                  const activeJointPaint = Skia.Paint();
-                  activeJointPaint.setColor(Skia.Color('#00FFFF'));
-                  activeJointPaint.setStyle(0);
-
-                  for (let idx = 0; idx < landmarks.length; idx++) {
-                    const lm = landmarks[idx];
-                    if (lm) {
-                      if (lm.visibility > 0.5) {
-                        const isKey = KEY_LANDMARKS.includes(idx);
-                        const paint = isKey ? activeJointPaint : jointPaint;
-                        const radius = isKey ? 8 : 4;
-                        canvas.drawCircle(lm.x * w, lm.y * h, radius, paint);
-                      }
-                    }
-                  }
-                }
-              });
-            } finally {
-              frame.dispose();
-            }
-          }}
-        />
-      ) : (
-        <Camera
-          style={StyleSheet.absoluteFill}
-          device={device}
-          isActive={appPhase !== 'results'}
-          outputs={[frameOutput]}
-        />
-      )}
+      {/* To enable Skia skeleton overlay, replace NormalCameraView above with: */}
+      {/* <SkiaCameraView
+        cameraPosition={cameraPosition}
+        isActive={appPhase !== 'results'}
+      /> */}
 
       {/* Overlay UI */}
       <View style={styles.overlay}>
-        {/* Top Buttons — Camera Switch + Skia Toggle */}
+        {/* Top Buttons — Camera Switch */}
         {appPhase !== 'results' && (
           <View style={styles.topButtons}>
-            <TouchableOpacity style={styles.iconButton} onPress={toggleSkia}>
-              <Layers color={useSkia ? '#00FF00' : '#fff'} size={28} />
-            </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton} onPress={toggleCamera}>
               <SwitchCamera color="#fff" size={28} />
             </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Skia Badge */}
-        {useSkia && appPhase !== 'results' && (
-          <View style={styles.skiaBadge}>
-            <Text style={styles.skiaBadgeText}>SKELETON ON</Text>
           </View>
         )}
 
@@ -484,25 +331,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     padding: 12,
     borderRadius: 24,
-  },
-
-  // Skia Badge
-  skiaBadge: {
-    position: 'absolute',
-    top: 60,
-    left: 20,
-    backgroundColor: 'rgba(0, 255, 0, 0.3)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#00FF00',
-  },
-  skiaBadgeText: {
-    fontSize: 12,
-    fontFamily: 'System',
-    color: '#00FF00',
-    letterSpacing: 2,
   },
 
   // Setup
