@@ -1,0 +1,23 @@
+{
+  "cxxNamespace": ["nitroposeexercises"],
+  "ios": {
+    "iosModuleName": "NitroPoseExercises"
+  },
+  "android": {
+    "androidNamespace": ["nitroposeexercises"],
+    "androidCxxLibName": "nitroposeexercises"
+  },
+  "autolinking": {
+    "NitroPoseExercises": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "NitroPoseExercises"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "NitroPoseExercises"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}
