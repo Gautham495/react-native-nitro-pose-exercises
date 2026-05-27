@@ -56,7 +56,6 @@ cd ios && pod install
   <tr>
     <th align="center">🍏 iOS Normal Mode</th>
     <th align="center">🍏 iOS Skia Mode</th>
-    <th align="center">🤖 Android Demo</th>
   </tr>
   <tr>
     <td align="center">
@@ -64,9 +63,6 @@ cd ios && pod install
     </td>
     <td align="center">
     <img alt="android" src="./docs/img/skia-iOS.png"  height="650" width="300"/>
-    </td>
-    <td align="center">
-    <div>Screenshot Coming Soon!</div>
     </td>
   </tr>
 </table>
@@ -128,25 +124,6 @@ module.exports = {
   ],
 };
 ```
-
----
-
-# GIF Demo
-
-<table>
-  <tr>
-    <th align="center">📸 Normal Mode</th>
-    <th align="center">💀 Skeleton Mode</th>
-  </tr>
-  <tr>
-    <td align="center">
-      <img alt="normal-mode" src="https://github.gauthamvijay.com/normal-iOS.gif" height="650" width="300"/>
-    </td>
-    <td align="center">
-      <img alt="skeleton-mode" src="https://github.gauthamvijay.com/skia-iOS.gif" height="650" width="300"/>
-    </td>
-  </tr>
-</table>
 
 ---
 
