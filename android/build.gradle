@@ -116,6 +116,12 @@ dependencies {
   implementation "com.facebook.react:react-android"
   implementation project(":react-native-nitro-modules")
 
+  // MediaPipe — bundled with your library
   implementation 'com.google.mediapipe:tasks-vision:0.10.21'
-  implementation project(':react-native-vision-camera')
+
+  // CameraX for ImageProxy access
+  implementation 'androidx.camera:camera-core:1.4.1'
+
+  // VisionCamera — provided by the consuming app
+  compileOnly project(':react-native-vision-camera')
 }

@@ -3,7 +3,7 @@ package com.margelo.nitro.nitroposeexercises
 import android.graphics.Bitmap
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-import com.google.mediapipe.framework.image.MediaImageBuilder
+import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
@@ -11,7 +11,6 @@ import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerOptions
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.camera.HybridFrameSpec
-import com.margelo.nitro.camera.`public`.NativeFrame
 import kotlin.math.acos
 import kotlin.math.max
 import kotlin.math.min
@@ -162,54 +161,54 @@ override fun processFrame(frame: HybridFrameSpec) {
     frameCount++
     if (frameCount % processEveryNFrames != 0) return
 
-    val nativeFrame = frame as? NativeFrame ?: return
-    val imageProxy = nativeFrame.image ?: return
-
     try {
-        val bitmapBuffer = Bitmap.createBitmap(
-            imageProxy.width,
-            imageProxy.height,
-            Bitmap.Config.ARGB_8888
-        )
+        val nativeBuffer = frame.getNativeBuffer()
+        val width = frame.getWidth().toInt()
+        val height = frame.getHeight().toInt()
 
-        // Use MediaPipe's BitmapImageBuilder
-        imageProxy.use {
-            val mpImage = com.google.mediapipe.framework.image.MediaImageBuilder(
-                imageProxy.image!!
-            ).build()
+        // On Android, nativeBuffer.pointer is an AHardwareBuffer*
+        // Convert to Bitmap via Android's HardwareBuffer API
+        val hardwareBuffer = android.hardware.HardwareBuffer.wrap(nativeBuffer.pointer)
+        val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, null)
+            ?: throw Exception("Failed to wrap HardwareBuffer to Bitmap")
 
-            val result = poseLandmarker!!.detect(mpImage)
+        // MediaPipe needs ARGB_8888, not hardware bitmap
+        val softBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
 
-            if (result.landmarks().isNotEmpty()) {
-                val poseLandmarks = result.landmarks()[0]
+        val mpImage = com.google.mediapipe.framework.image.BitmapImageBuilder(softBitmap).build()
+        val result = poseLandmarker!!.detect(mpImage)
 
-                if (poseWasLost) {
-                    poseWasLost = false
-                    onPoseRegained?.invoke()
-                }
+        if (result.landmarks().isNotEmpty()) {
+            val poseLandmarks = result.landmarks()[0]
 
-                _landmarks = poseLandmarks.map { lm ->
-                    Landmark(
-                        x = lm.x().toDouble(),
-                        y = lm.y().toDouble(),
-                        z = lm.z().toDouble(),
-                        visibility = (lm.visibility().orElse(0f)).toDouble()
-                    )
-                }.toTypedArray()
-
-                if (_status == SessionStatus.ACTIVE) {
-                    processExerciseLogic()
-                }
-            } else {
-                if (!poseWasLost) {
-                    poseWasLost = true
-                    onPoseLost?.invoke()
-                }
-                _landmarks = emptyArray()
+            if (poseWasLost) {
+                poseWasLost = false
+                onPoseRegained?.invoke()
             }
+
+            _landmarks = poseLandmarks.map { lm ->
+                Landmark(
+                    x = lm.x().toDouble(),
+                    y = lm.y().toDouble(),
+                    z = lm.z().toDouble(),
+                    visibility = (lm.visibility().orElse(0f)).toDouble()
+                )
+            }.toTypedArray()
+
+            if (_status == SessionStatus.ACTIVE) {
+                processExerciseLogic()
+            }
+        } else {
+            if (!poseWasLost) {
+                poseWasLost = true
+                onPoseLost?.invoke()
+            }
+            _landmarks = emptyArray()
         }
 
-        bitmapBuffer.recycle()
+        softBitmap.recycle()
+        bitmap.recycle()
+        nativeBuffer.release()
 
     } catch (e: Exception) {
         // MediaPipe detection failed — skip this frame
