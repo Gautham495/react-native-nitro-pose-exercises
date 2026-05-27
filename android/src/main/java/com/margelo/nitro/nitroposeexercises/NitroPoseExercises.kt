@@ -1,10 +1,9 @@
 package com.margelo.nitro.nitroposeexercises
 
 import android.graphics.Bitmap
-import android.graphics.Matrix
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-import com.google.mediapipe.framework.image.BitmapImageBuilder
+import com.google.mediapipe.framework.image.MediaImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
@@ -12,7 +11,7 @@ import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerOptions
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.camera.HybridFrameSpec
-import com.margelo.nitro.camera.NativeFrame
+import com.margelo.nitro.camera.`public`.NativeFrame
 import kotlin.math.acos
 import kotlin.math.max
 import kotlin.math.min
@@ -156,59 +155,66 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
   // Frame Processing
   // ═══════════════════════════════════════════════════════════
 
-  override fun processFrame(frame: HybridFrameSpec) {
+override fun processFrame(frame: HybridFrameSpec) {
     if (_status != SessionStatus.ACTIVE && _status != SessionStatus.COUNTDOWN) return
     if (!isInitialized || poseLandmarker == null) return
-
-    // Cast to NativeFrame to get the ImageProxy
-    val nativeFrame = frame as? NativeFrame ?: return
-    val imageProxy = nativeFrame.image ?: return
 
     frameCount++
     if (frameCount % processEveryNFrames != 0) return
 
+    val nativeFrame = frame as? NativeFrame ?: return
+    val imageProxy = nativeFrame.image ?: return
+
     try {
-      // Convert ImageProxy to Bitmap
-      val bitmap = imageProxyToBitmap(imageProxy)
-      val mpImage = BitmapImageBuilder(bitmap).build()
+        val bitmapBuffer = Bitmap.createBitmap(
+            imageProxy.width,
+            imageProxy.height,
+            Bitmap.Config.ARGB_8888
+        )
 
-      val result = poseLandmarker!!.detect(mpImage)
+        // Use MediaPipe's BitmapImageBuilder
+        imageProxy.use {
+            val mpImage = com.google.mediapipe.framework.image.MediaImageBuilder(
+                imageProxy.image!!
+            ).build()
 
-      if (result.landmarks().isNotEmpty()) {
-        val poseLandmarks = result.landmarks()[0]
+            val result = poseLandmarker!!.detect(mpImage)
 
-        if (poseWasLost) {
-          poseWasLost = false
-          onPoseRegained?.invoke()
+            if (result.landmarks().isNotEmpty()) {
+                val poseLandmarks = result.landmarks()[0]
+
+                if (poseWasLost) {
+                    poseWasLost = false
+                    onPoseRegained?.invoke()
+                }
+
+                _landmarks = poseLandmarks.map { lm ->
+                    Landmark(
+                        x = lm.x().toDouble(),
+                        y = lm.y().toDouble(),
+                        z = lm.z().toDouble(),
+                        visibility = (lm.visibility().orElse(0f)).toDouble()
+                    )
+                }.toTypedArray()
+
+                if (_status == SessionStatus.ACTIVE) {
+                    processExerciseLogic()
+                }
+            } else {
+                if (!poseWasLost) {
+                    poseWasLost = true
+                    onPoseLost?.invoke()
+                }
+                _landmarks = emptyArray()
+            }
         }
 
-        _landmarks = poseLandmarks.map { lm ->
-          Landmark(
-            x = lm.x().toDouble(),
-            y = lm.y().toDouble(),
-            z = lm.z().toDouble(),
-            visibility = (lm.visibility().orElse(0f)).toDouble()
-          )
-        }.toTypedArray()
-
-        if (_status == SessionStatus.ACTIVE) {
-          processExerciseLogic()
-        }
-
-      } else {
-        if (!poseWasLost) {
-          poseWasLost = true
-          onPoseLost?.invoke()
-        }
-        _landmarks = emptyArray()
-      }
-
-      bitmap.recycle()
+        bitmapBuffer.recycle()
 
     } catch (e: Exception) {
-      // MediaPipe detection failed — skip this frame
+        // MediaPipe detection failed — skip this frame
     }
-  }
+}
 
   // ═══════════════════════════════════════════════════════════
   // ImageProxy to Bitmap conversion
