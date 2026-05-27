@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-pose-exercises",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Real-time on-device exercise tracking for React Native. Rep counting, form validation, and skeleton overlay powered by MediaPipe Pose Landmarker and VisionCamera v5 via Nitro Modules.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
