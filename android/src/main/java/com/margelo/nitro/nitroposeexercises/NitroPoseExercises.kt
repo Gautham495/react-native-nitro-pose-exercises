@@ -7,10 +7,11 @@ import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
-import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerOptions
+import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker.PoseLandmarkerOptions
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.camera.HybridFrameSpec
+import com.margelo.nitro.camera.public.NativeFrame
 import kotlin.math.acos
 import kotlin.math.max
 import kotlin.math.min
@@ -18,7 +19,7 @@ import kotlin.math.sqrt
 
 @Keep
 @DoNotStrip
-class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
+class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
 
   // ─── MediaPipe ──────────────────────────────────────────────
   private var poseLandmarker: PoseLandmarker? = null
@@ -46,8 +47,6 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
   private var sessionStartTime: Long = System.currentTimeMillis()
   private var targetReps: Double = 0.0
   private var countdownSeconds: Double = 0.0
-  private var frameCount: Int = 0
-  private val processEveryNFrames: Int = 3
 
   // ─── Form Tracking ──────────────────────────────────────────
   private var lastFormFeedbackTime = mutableMapOf<String, Long>()
@@ -59,6 +58,10 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
 
   // ─── Pose Tracking ──────────────────────────────────────────
   private var poseWasLost = false
+
+  // ─── Frame Skip ─────────────────────────────────────────────
+  private var frameCount: Int = 0
+  private val processEveryNFrames: Int = 3
 
   // ─── Callbacks ──────────────────────────────────────────────
   override var onRepComplete: ((data: RepData) -> Unit)? = null
@@ -154,7 +157,7 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
   // Frame Processing
   // ═══════════════════════════════════════════════════════════
 
-override fun processFrame(frame: HybridFrameSpec) {
+  override fun processFrame(frame: HybridFrameSpec) {
     if (_status != SessionStatus.ACTIVE && _status != SessionStatus.COUNTDOWN) return
     if (!isInitialized || poseLandmarker == null) return
 
@@ -162,94 +165,50 @@ override fun processFrame(frame: HybridFrameSpec) {
     if (frameCount % processEveryNFrames != 0) return
 
     try {
-        val nativeBuffer = frame.getNativeBuffer()
-        val width = frame.getWidth().toInt()
-        val height = frame.getHeight().toInt()
+      // Get the native buffer from VisionCamera frame
+      val nativeBuffer = frame.getNativeBuffer()
+      val w = frame.width.toInt()
+      val h = frame.height.toInt()
 
-        // On Android, nativeBuffer.pointer is an AHardwareBuffer*
-        // Convert to Bitmap via Android's HardwareBuffer API
-        val hardwareBuffer = android.hardware.HardwareBuffer.wrap(nativeBuffer.pointer)
-        val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, null)
-            ?: throw Exception("Failed to wrap HardwareBuffer to Bitmap")
+      // On Android, the pointer is an AHardwareBuffer*
+      // Create a Bitmap and use MediaPipe's BitmapImageBuilder
+      val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+      val mpImage = BitmapImageBuilder(bitmap).build()
+      val result = poseLandmarker!!.detect(mpImage)
 
-        // MediaPipe needs ARGB_8888, not hardware bitmap
-        val softBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+      if (result.landmarks().isNotEmpty()) {
+        val poseLandmarks = result.landmarks()[0]
 
-        val mpImage = com.google.mediapipe.framework.image.BitmapImageBuilder(softBitmap).build()
-        val result = poseLandmarker!!.detect(mpImage)
-
-        if (result.landmarks().isNotEmpty()) {
-            val poseLandmarks = result.landmarks()[0]
-
-            if (poseWasLost) {
-                poseWasLost = false
-                onPoseRegained?.invoke()
-            }
-
-            _landmarks = poseLandmarks.map { lm ->
-                Landmark(
-                    x = lm.x().toDouble(),
-                    y = lm.y().toDouble(),
-                    z = lm.z().toDouble(),
-                    visibility = (lm.visibility().orElse(0f)).toDouble()
-                )
-            }.toTypedArray()
-
-            if (_status == SessionStatus.ACTIVE) {
-                processExerciseLogic()
-            }
-        } else {
-            if (!poseWasLost) {
-                poseWasLost = true
-                onPoseLost?.invoke()
-            }
-            _landmarks = emptyArray()
+        if (poseWasLost) {
+          poseWasLost = false
+          onPoseRegained?.invoke()
         }
 
-        softBitmap.recycle()
-        bitmap.recycle()
-        nativeBuffer.release()
+        _landmarks = poseLandmarks.map { lm ->
+          Landmark(
+            x = lm.x().toDouble(),
+            y = lm.y().toDouble(),
+            z = lm.z().toDouble(),
+            visibility = (lm.visibility().orElse(0f)).toDouble()
+          )
+        }.toTypedArray()
+
+        if (_status == SessionStatus.ACTIVE) {
+          processExerciseLogic()
+        }
+      } else {
+        if (!poseWasLost) {
+          poseWasLost = true
+          onPoseLost?.invoke()
+        }
+        _landmarks = emptyArray()
+      }
+
+      bitmap.recycle()
+      nativeBuffer.release()
 
     } catch (e: Exception) {
-        // MediaPipe detection failed — skip this frame
-    }
-}
-
-  // ═══════════════════════════════════════════════════════════
-  // ImageProxy to Bitmap conversion
-  // ═══════════════════════════════════════════════════════════
-
-  private fun imageProxyToBitmap(imageProxy: androidx.camera.core.ImageProxy): Bitmap {
-    val buffer = imageProxy.planes[0].buffer
-    val bytes = ByteArray(buffer.remaining())
-    buffer.get(bytes)
-
-    val yuvImage = android.graphics.YuvImage(
-      bytes,
-      android.graphics.ImageFormat.NV21,
-      imageProxy.width,
-      imageProxy.height,
-      null
-    )
-
-    val out = java.io.ByteArrayOutputStream()
-    yuvImage.compressToJpeg(
-      android.graphics.Rect(0, 0, imageProxy.width, imageProxy.height),
-      100,
-      out
-    )
-
-    val jpegBytes = out.toByteArray()
-    val bitmap = android.graphics.BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
-
-    // Apply rotation if needed
-    val rotation = imageProxy.imageInfo.rotationDegrees
-    return if (rotation != 0) {
-      val matrix = Matrix()
-      matrix.postRotate(rotation.toFloat())
-      Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-    } else {
-      bitmap
+      // MediaPipe detection failed — skip this frame
     }
   }
 
@@ -261,7 +220,6 @@ override fun processFrame(frame: HybridFrameSpec) {
     val config = exerciseConfig ?: return
     if (_landmarks.isEmpty()) return
 
-    // 1. Calculate all angles
     val currentAngles = mutableMapOf<String, Double>()
     val angleSnapshots = mutableListOf<AngleSnapshot>()
 
@@ -279,7 +237,6 @@ override fun processFrame(frame: HybridFrameSpec) {
 
     repAngleSnapshots = angleSnapshots.toTypedArray()
 
-    // 2. Determine current phase
     val detectedPhase = determinePhase(currentAngles, config)
 
     if (detectedPhase != _currentPhase && detectedPhase != ExercisePhase.UNKNOWN) {
@@ -288,10 +245,8 @@ override fun processFrame(frame: HybridFrameSpec) {
       handlePhaseTransition(detectedPhase, config)
     }
 
-    // 3. Check form rules
     checkFormRules(currentAngles, config)
 
-    // 4. Handle hold-based exercises
     if (config.type == ExerciseType.HOLD) {
       handleHoldProgress(currentAngles, config)
     }
@@ -345,37 +300,37 @@ override fun processFrame(frame: HybridFrameSpec) {
     if (phaseHistory.size >= repSeq.size) {
       val tail = phaseHistory.takeLast(repSeq.size)
 
-    if (tail == repSeq.toList()) {
+      if (tail == repSeq.toList()) {
         val now = System.currentTimeMillis()
         val repDuration = (now - repStartTime).toDouble()
 
         // Minimum 800ms per rep
         if (repDuration < 800) {
-            phaseHistory.clear()
-            phaseHistory.add(newPhase)
-            return
+          phaseHistory.clear()
+          phaseHistory.add(newPhase)
+          return
         }
 
         // Don't count rep if form is terrible
         if (repFormScore <= 30) {
-            onFormFeedback?.invoke(FormFeedback(
-                ruleName = "poorForm",
-                message = "Fix your form before continuing",
-                severity = FormSeverity.ERROR
-            ))
-            repFormScore = 100.0
-            phaseHistory.clear()
-            phaseHistory.add(newPhase)
-            return
+          onFormFeedback?.invoke(FormFeedback(
+            ruleName = "poorForm",
+            message = "Fix your form before continuing",
+            severity = FormSeverity.ERROR
+          ))
+          repFormScore = 100.0
+          phaseHistory.clear()
+          phaseHistory.add(newPhase)
+          return
         }
 
         _repCount += 1.0
 
         val repData = RepData(
-            repNumber = _repCount,
-            durationMs = repDuration,
-            formScore = repFormScore,
-            angles = repAngleSnapshots
+          repNumber = _repCount,
+          durationMs = repDuration,
+          formScore = repFormScore,
+          angles = repAngleSnapshots
         )
 
         allRepDurations.add(repDuration)
@@ -389,9 +344,9 @@ override fun processFrame(frame: HybridFrameSpec) {
         phaseHistory.add(newPhase)
 
         if (targetReps > 0 && _repCount >= targetReps) {
-            completeSession()
+          completeSession()
         }
-    }
+      }
     }
 
     val maxHistory = repSeq.size * 2
@@ -410,7 +365,6 @@ override fun processFrame(frame: HybridFrameSpec) {
 
     for (rule in config.formRules) {
       val angle = currentAngles[rule.angleName] ?: continue
-
       val isViolating = angle < rule.minAngle || angle > rule.maxAngle
 
       if (isViolating) {
@@ -453,24 +407,18 @@ override fun processFrame(frame: HybridFrameSpec) {
     }
 
     if (inPosition) {
-      if (holdStartTime == null) {
-        holdStartTime = System.currentTimeMillis()
-      }
+      if (holdStartTime == null) holdStartTime = System.currentTimeMillis()
 
       val elapsed = (System.currentTimeMillis() - holdStartTime!!).toDouble()
       val stability = min(100.0, max(0.0, repFormScore))
 
-      val progress = HoldProgress(
+      onHoldProgress?.invoke(HoldProgress(
         elapsedMs = elapsed,
         targetMs = config.holdDurationMs,
         stability = stability
-      )
+      ))
 
-      onHoldProgress?.invoke(progress)
-
-      if (elapsed >= config.holdDurationMs) {
-        completeSession()
-      }
+      if (elapsed >= config.holdDurationMs) completeSession()
     } else {
       holdStartTime = null
     }
@@ -487,16 +435,14 @@ override fun processFrame(frame: HybridFrameSpec) {
     val avgRepDuration = if (allRepDurations.isEmpty()) 0.0 else allRepDurations.average()
     val avgFormScore = if (allRepFormScores.isEmpty()) 100.0 else allRepFormScores.average()
 
-    val result = SessionResult(
+    onSessionComplete?.invoke(SessionResult(
       totalReps = _repCount,
       totalDurationMs = totalDuration,
       averageRepDurationMs = avgRepDuration,
       averageFormScore = avgFormScore,
       formViolations = sessionFormViolations.toTypedArray(),
       angleHistory = repAngleSnapshots
-    )
-
-    onSessionComplete?.invoke(result)
+    ))
   }
 
   // ═══════════════════════════════════════════════════════════

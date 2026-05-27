@@ -116,4 +116,6 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    implementation("com.google.mediapipe:tasks-vision:0.10.29")
 }

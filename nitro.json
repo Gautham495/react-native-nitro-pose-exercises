@@ -19,5 +19,12 @@
       }
     }
   },
-  "ignorePaths": ["node_modules"]
+  "ignorePaths": [
+    "node_modules",
+    "example",
+    "nitrogen/generated/android/kotlin/com/margelo/nitro/camera",
+    "nitrogen/generated/android/kotlin/com/margelo/nitro/image",
+    "nitrogen/generated/ios/swift/VisionCamera",
+    "nitrogen/generated/ios/swift/NitroImage"
+  ]
 }
