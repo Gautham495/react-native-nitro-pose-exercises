@@ -13,7 +13,6 @@ import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.camera.HybridFrameSpec
-import com.margelo.nitro.camera.NativeFrame
 import kotlin.math.acos
 import kotlin.math.max
 import kotlin.math.min
@@ -191,7 +190,7 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
   // Frame Processing (ML Kit — async with cached results)
   // ═══════════════════════════════════════════════════════════
 
-  override fun processFrame(frame: HybridFrameSpec) {
+ override fun processFrame(frame: HybridFrameSpec) {
     if (_status != SessionStatus.ACTIVE && _status != SessionStatus.COUNTDOWN) return
     if (!isInitialized || poseDetector == null) return
 
@@ -199,17 +198,26 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
     frameCount++
     if (frameCount % processEveryNFrames != 0) return
 
-    // Get the ImageProxy from VisionCamera frame
-    val nativeFrame = frame as? NativeFrame ?: return
-    val imageProxy = nativeFrame.image ?: return
-
     try {
-      // ML Kit takes InputImage directly from ImageProxy — no color conversion needed
-      @androidx.camera.core.ExperimentalGetImage
-      val mediaImage: Image = imageProxy.image ?: return
-      val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+      // Get raw buffer from VisionCamera frame
+      val nativeBuffer = frame.getNativeBuffer()
+      val width = frame.getWidth()
+      val height = frame.getHeight()
+      val bytesPerRow = frame.getBytesPerRow()
 
-      // ML Kit is async — fire detection, cache result, use cached landmarks for current frame
+      // Create Bitmap from the native buffer
+      val buffer = java.nio.ByteBuffer.allocateDirect(height * bytesPerRow)
+      val pointer = nativeBuffer.pointer
+      // Copy from native pointer to ByteBuffer
+      NativeBufferHelper.copyToByteBuffer(pointer, buffer, height * bytesPerRow)
+
+      val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+      buffer.rewind()
+      bitmap.copyPixelsFromBuffer(buffer)
+
+      val inputImage = InputImage.fromBitmap(bitmap, 0)
+
+      // ML Kit is async — fire detection, cache result
       poseDetector!!.process(inputImage)
         .addOnSuccessListener { pose ->
           val poseLandmarks = pose.allPoseLandmarks
@@ -220,17 +228,15 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
               onPoseRegained?.invoke()
             }
 
-            // Build landmark array mapped to MediaPipe indices (34 slots)
             val landmarkArray = Array(34) { Landmark(x = 0.0, y = 0.0, z = 0.0, visibility = 0.0) }
 
-            val imageWidth = inputImage.width.toDouble()
-            val imageHeight = inputImage.height.toDouble()
+            val imageWidth = width.toDouble()
+            val imageHeight = height.toDouble()
 
             for (poseLandmark in poseLandmarks) {
               val mediaPipeIndex = mlKitToMediaPipeMap[poseLandmark.landmarkType] ?: continue
               if (mediaPipeIndex >= 34) continue
 
-              // Normalize coordinates to 0-1 range
               landmarkArray[mediaPipeIndex] = Landmark(
                 x = poseLandmark.position.x.toDouble() / imageWidth,
                 y = poseLandmark.position.y.toDouble() / imageHeight,
@@ -251,12 +257,15 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
               cachedLandmarks = emptyArray()
             }
           }
+
+          bitmap.recycle()
         }
         .addOnFailureListener { e ->
           println("[PoseExercise] ML Kit error: ${e.message}")
+          bitmap.recycle()
         }
 
-      // Use cached landmarks for exercise logic (from previous frame's detection)
+      // Use cached landmarks for exercise logic
       val currentLandmarks: Array<Landmark>
       synchronized(landmarkLock) {
         currentLandmarks = cachedLandmarks.copyOf()

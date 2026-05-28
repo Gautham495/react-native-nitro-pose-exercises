@@ -127,7 +127,7 @@ module.exports = {
 The iOS podspec needs the Vision and AVFoundation system frameworks:
 
 ```ruby
-s.frameworks = 'Vision', 'AVFoundation'
+ s.frameworks = ["AVFoundation", "Vision"]
 ```
 
 No CocoaPods dependencies required — Vision is built into iOS.
