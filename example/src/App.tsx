@@ -49,6 +49,7 @@ export default function App() {
   useEffect(() => {
     async function init() {
       try {
+        await nitroPoseExercises.initialize('');
         nitroPoseExercises.loadExercise(PUSHUP_CONFIG);
         setIsInitialized(true);
       } catch (error) {
