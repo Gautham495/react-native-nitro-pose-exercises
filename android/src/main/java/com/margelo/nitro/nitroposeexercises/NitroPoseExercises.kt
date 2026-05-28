@@ -190,34 +190,21 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
   // Frame Processing (ML Kit — async with cached results)
   // ═══════════════════════════════════════════════════════════
 
- override fun processFrame(frame: HybridFrameSpec) {
+override fun processFrame(frame: HybridFrameSpec) {
     if (_status != SessionStatus.ACTIVE && _status != SessionStatus.COUNTDOWN) return
     if (!isInitialized || poseDetector == null) return
 
-    // Frame throttle
     frameCount++
     if (frameCount % processEveryNFrames != 0) return
 
     try {
-      // Get raw buffer from VisionCamera frame
       val nativeBuffer = frame.getNativeBuffer()
-      val width = frame.getWidth()
-      val height = frame.getHeight()
-      val bytesPerRow = frame.getBytesPerRow()
-
-      // Create Bitmap from the native buffer
-      val buffer = java.nio.ByteBuffer.allocateDirect(height * bytesPerRow)
-      val pointer = nativeBuffer.pointer
-      // Copy from native pointer to ByteBuffer
-      NativeBufferHelper.copyToByteBuffer(pointer, buffer, height * bytesPerRow)
-
-      val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-      buffer.rewind()
-      bitmap.copyPixelsFromBuffer(buffer)
+      val bitmap = FrameHelper.hardwareBufferToBitmap(nativeBuffer.pointer) ?: return
 
       val inputImage = InputImage.fromBitmap(bitmap, 0)
+      val imageWidth = bitmap.width.toDouble()
+      val imageHeight = bitmap.height.toDouble()
 
-      // ML Kit is async — fire detection, cache result
       poseDetector!!.process(inputImage)
         .addOnSuccessListener { pose ->
           val poseLandmarks = pose.allPoseLandmarks
@@ -229,9 +216,6 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
             }
 
             val landmarkArray = Array(34) { Landmark(x = 0.0, y = 0.0, z = 0.0, visibility = 0.0) }
-
-            val imageWidth = width.toDouble()
-            val imageHeight = height.toDouble()
 
             for (poseLandmark in poseLandmarks) {
               val mediaPipeIndex = mlKitToMediaPipeMap[poseLandmark.landmarkType] ?: continue
@@ -265,7 +249,7 @@ class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
           bitmap.recycle()
         }
 
-      // Use cached landmarks for exercise logic
+      // Use cached landmarks from previous frame
       val currentLandmarks: Array<Landmark>
       synchronized(landmarkLock) {
         currentLandmarks = cachedLandmarks.copyOf()

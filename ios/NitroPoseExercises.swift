@@ -1,4 +1,4 @@
-// ios/HybridPoseExercise.swift
+// ios/NitroPoseExercises.swift
 
 import Foundation
 import NitroModules
@@ -6,7 +6,7 @@ import VisionCamera
 import AVFoundation
 import Vision
 
-class HybridPoseExercise: HybridNitroPoseExercisesSpec {
+class NitroPoseExercises: HybridNitroPoseExercisesSpec {
 
   // ─── Vision Framework ───────────────────────────────────────
   private var isInitialized = false

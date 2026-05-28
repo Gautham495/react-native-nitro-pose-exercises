@@ -29,3 +29,10 @@ target_link_libraries(
     ${PACKAGE_NAME}
     react-native-vision-camera::VisionCamera
 )
+
+find_library(android-lib android)
+
+target_link_libraries(
+    ${PACKAGE_NAME}
+    ${android-lib}
+)
