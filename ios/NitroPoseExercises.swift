@@ -199,7 +199,7 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
       // Fill all slots with zero-visibility first
       var landmarkArray = [Landmark](repeating: Landmark(x: 0, y: 0, z: 0, visibility: 0), count: 34)
 
-      for (jointName, mediaPipeIndex) in HybridPoseExercise.visionToMediaPipeMap {
+      for (jointName, mediaPipeIndex) in NitroPoseExercises.visionToMediaPipeMap {
         guard mediaPipeIndex < 34 else { continue }
 
         do {

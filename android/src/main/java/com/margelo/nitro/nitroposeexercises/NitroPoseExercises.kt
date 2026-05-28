@@ -20,7 +20,7 @@ import kotlin.math.sqrt
 
 @Keep
 @DoNotStrip
-class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
+class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
 
   // ─── ML Kit ─────────────────────────────────────────────────
   private var poseDetector: PoseDetector? = null
