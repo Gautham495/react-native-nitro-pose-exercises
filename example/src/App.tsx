@@ -49,7 +49,6 @@ export default function App() {
   useEffect(() => {
     async function init() {
       try {
-        await nitroPoseExercises.initialize('pose_landmarker_lite.task');
         nitroPoseExercises.loadExercise(PUSHUP_CONFIG);
         setIsInitialized(true);
       } catch (error) {

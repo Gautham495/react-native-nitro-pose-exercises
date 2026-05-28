@@ -1,14 +1,42 @@
+// ios/HybridPoseExercise.swift
+
 import Foundation
 import NitroModules
-import MediaPipeTasksVision
 import VisionCamera
 import AVFoundation
+import Vision
 
-class NitroPoseExercises: HybridNitroPoseExercisesSpec {
+class HybridPoseExercise: HybridNitroPoseExercisesSpec {
 
-  // ─── MediaPipe ──────────────────────────────────────────────
-  private var poseLandmarker: PoseLandmarker?
+  // ─── Vision Framework ───────────────────────────────────────
   private var isInitialized = false
+
+  // ─── Landmark Index Mapping ─────────────────────────────────
+  // Maps Apple Vision joint names to MediaPipe landmark indices
+  // that our JS configs expect
+  private static let visionToMediaPipeMap: [(VNHumanBodyPoseObservation.JointName, Int)] = [
+    (.nose, 0),
+    (.leftShoulder, 11),
+    (.rightShoulder, 12),
+    (.leftElbow, 13),
+    (.rightElbow, 14),
+    (.leftWrist, 15),
+    (.rightWrist, 16),
+    (.leftHip, 23),
+    (.rightHip, 24),
+    (.leftKnee, 25),
+    (.rightKnee, 26),
+    (.leftAnkle, 27),
+    (.rightAnkle, 28),
+    // Vision also provides these but they map to non-standard indices
+    // We include them for skeleton drawing
+    (.neck, 10),         // approximate — MediaPipe doesn't have neck
+    (.root, 33),         // hip center — not in MediaPipe, we skip
+    (.leftEar, 7),
+    (.rightEar, 8),
+    (.leftEye, 2),
+    (.rightEye, 5),
+  ]
 
   // ─── Exercise Config ────────────────────────────────────────
   private var exerciseConfig: ExerciseConfig?
@@ -34,9 +62,6 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
   private var countdownSeconds: Double = 0
   private var countdownTimer: Timer?
 
-  private var frameCount: Int = 0
-  private let processEveryNFrames: Int = 3  // Only process every 3rd frame
-
   // ─── Form Tracking ──────────────────────────────────────────
   private var lastFormFeedbackTime: [String: Date] = [:]
   private var sessionFormViolations: [FormFeedback] = []
@@ -47,6 +72,10 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
 
   // ─── Pose Tracking ──────────────────────────────────────────
   private var poseWasLost = false
+
+  // ─── Frame Throttle ─────────────────────────────────────────
+  private var frameCount: Int = 0
+  private let processEveryNFrames: Int = 3
 
   // ─── Callbacks ──────────────────────────────────────────────
   var onRepComplete: ((_ data: RepData) -> Void)?
@@ -65,28 +94,15 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
   // ═══════════════════════════════════════════════════════════
 
   func initialize(modelPath: String) throws -> Promise<Void> {
-    print("[PoseExercise] initialize called with path: \(modelPath)")
-
+    // No model loading needed — Vision framework is built into iOS
     return Promise.async { [weak self] in
       guard let self = self else { return }
-
-      let options = PoseLandmarkerOptions()
-      options.baseOptions.modelAssetPath = modelPath
-      options.runningMode = .image
-      options.numPoses = 1
-      options.minPoseDetectionConfidence = 0.5
-      options.minPosePresenceConfidence = 0.5
-      options.minTrackingConfidence = 0.5
-
-      self.poseLandmarker = try PoseLandmarker(options: options)
       self.isInitialized = true
-
-      print("[PoseExercise] MediaPipe initialized successfully")
+      print("[PoseExercise] Initialized with Apple Vision (no model file needed)")
     }
   }
 
   func release() throws {
-    poseLandmarker = nil
     isInitialized = false
     _status = .idle
     resetSession()
@@ -106,8 +122,6 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
   // ═══════════════════════════════════════════════════════════
 
   func startSession(targetReps: Double, countdownSeconds: Double) throws {
-    print("[PoseExercise] startSession called - target: \(targetReps), countdown: \(countdownSeconds)")
-
     resetSession()
     self.targetReps = targetReps
     self.countdownSeconds = countdownSeconds
@@ -138,75 +152,90 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // MARK: - Frame Processing
+  // MARK: - Frame Processing (Apple Vision)
   // ═══════════════════════════════════════════════════════════
 
-func processFrame(frame: any HybridFrameSpec) throws {
-  print("[PoseExercise] processFrame called, status: \(_status)")
+  func processFrame(frame: any HybridFrameSpec) throws {
+    guard _status == .active || _status == .countdown else { return }
+    guard isInitialized else { return }
 
-  frameCount += 1
-  if frameCount % processEveryNFrames != 0 { return }
+    // Frame throttle
+    frameCount += 1
+    if frameCount % processEveryNFrames != 0 { return }
 
-  guard _status == .active || _status == .countdown else {
-    print("[PoseExercise] Skipping - status is \(_status)")
-    return
-  }
-  guard isInitialized, let landmarker = poseLandmarker else {
-    print("[PoseExercise] Skipping - not initialized: \(isInitialized)")
-    return
-  }
+    // Get CMSampleBuffer from VisionCamera frame
+    guard let nativeFrame = frame as? any NativeFrame,
+          let sampleBuffer = nativeFrame.sampleBuffer else { return }
 
-  guard let nativeFrame = frame as? any NativeFrame else {
-    print("[PoseExercise] Failed to cast to NativeFrame")
-    return
-  }
-  guard let sampleBuffer = nativeFrame.sampleBuffer else {
-    print("[PoseExercise] sampleBuffer is nil")
-    return
-  }
+    // Get pixel buffer — Vision takes CVPixelBuffer directly, no color conversion needed
+    guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-  print("[PoseExercise] Got sampleBuffer, running detection...")
+    // Create Vision request
+    let request = VNDetectHumanBodyPoseRequest()
 
-  do {
-    let mpImage = try MPImage(sampleBuffer: sampleBuffer)
-    let result = try landmarker.detect(image: mpImage)
+    // Run synchronously on this frame processor thread
+    let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
 
-    print("[PoseExercise] Detection done, landmarks count: \(result.landmarks.count)")
+    do {
+      try handler.perform([request])
 
-    if let poseLandmarks = result.landmarks.first {
+      guard let observation = request.results?.first else {
+        // No pose detected
+        if !poseWasLost {
+          poseWasLost = true
+          onPoseLost?()
+        }
+        _landmarks = []
+        return
+      }
+
+      // Pose detected
       if poseWasLost {
         poseWasLost = false
         onPoseRegained?()
       }
 
-      _landmarks = poseLandmarks.map { lm in
-        Landmark(
-          x: Double(lm.x),
-          y: Double(lm.y),
-          z: Double(lm.z),
-          visibility: Double(lm.visibility ?? 0)
-        )
+      // Map Vision joints to MediaPipe landmark array (34 slots, indices 0-33)
+      // Fill all slots with zero-visibility first
+      var landmarkArray = [Landmark](repeating: Landmark(x: 0, y: 0, z: 0, visibility: 0), count: 34)
+
+      for (jointName, mediaPipeIndex) in HybridPoseExercise.visionToMediaPipeMap {
+        guard mediaPipeIndex < 34 else { continue }
+
+        do {
+          let point = try observation.recognizedPoint(jointName)
+
+          // Vision uses bottom-left origin (0,0 = bottom-left)
+          // MediaPipe uses top-left origin (0,0 = top-left)
+          // Flip Y axis
+          let confidence = Double(point.confidence)
+
+          landmarkArray[mediaPipeIndex] = Landmark(
+            x: Double(point.location.x),
+            y: 1.0 - Double(point.location.y),  // flip Y
+            z: 0,  // Vision doesn't provide Z depth
+            visibility: confidence
+          )
+
+          // Debug logging — uncomment to verify mapping
+          // print("[PoseExercise] \(jointName.rawValue.rawValue) → index \(mediaPipeIndex): x=\(String(format: "%.3f", point.location.x)) y=\(String(format: "%.3f", 1.0 - Double(point.location.y))) conf=\(String(format: "%.2f", confidence))")
+
+        } catch {
+          // Joint not detected — leave as zero visibility
+          continue
+        }
       }
 
-      print("[PoseExercise] Landmarks detected: \(_landmarks.count)")
+      _landmarks = landmarkArray
 
       if _status == .active {
         processExerciseLogic()
       }
 
-    } else {
-      print("[PoseExercise] No pose detected in frame")
-      if !poseWasLost {
-        poseWasLost = true
-        onPoseLost?()
-      }
-      _landmarks = []
+    } catch {
+      print("[PoseExercise] Vision error: \(error.localizedDescription)")
     }
-
-  } catch {
-    print("[PoseExercise] MediaPipe error: \(error.localizedDescription)")
   }
-}
 
   // ═══════════════════════════════════════════════════════════
   // MARK: - Exercise Logic Engine
@@ -216,7 +245,6 @@ func processFrame(frame: any HybridFrameSpec) throws {
     guard let config = exerciseConfig else { return }
     guard !_landmarks.isEmpty else { return }
 
-    // 1. Calculate all angles defined in the config
     var currentAngles: [String: Double] = [:]
     var angleSnapshots: [AngleSnapshot] = []
 
@@ -226,6 +254,11 @@ func processFrame(frame: any HybridFrameSpec) throws {
       let c = Int(angleDef.landmarkC)
 
       guard a < _landmarks.count, b < _landmarks.count, c < _landmarks.count else { continue }
+
+      // Only calculate if all three landmarks have reasonable confidence
+      guard _landmarks[a].visibility > 0.3,
+            _landmarks[b].visibility > 0.3,
+            _landmarks[c].visibility > 0.3 else { continue }
 
       let angle = calculateAngle(
         pointA: _landmarks[a],
@@ -239,31 +272,25 @@ func processFrame(frame: any HybridFrameSpec) throws {
 
     repAngleSnapshots = angleSnapshots
 
-    // 2. Determine current phase from angle thresholds
+    // Debug logging — uncomment to see angles
+    // for (name, angle) in currentAngles {
+    //   print("[PoseExercise] Angle \(name): \(String(format: "%.1f", angle))°")
+    // }
+
     let detectedPhase = determinePhase(from: currentAngles, config: config)
 
     if detectedPhase != _currentPhase && detectedPhase != .unknown {
       let previousPhase = _currentPhase
       _currentPhase = detectedPhase
       onPhaseChange?(detectedPhase)
-
-      // 3. Update phase history for rep counting
       handlePhaseTransition(from: previousPhase, to: detectedPhase, config: config)
     }
 
-    // 4. Check form rules
     checkFormRules(currentAngles: currentAngles, config: config)
 
-    // 5. Handle hold-based exercises
     if config.type == .hold {
       handleHoldProgress(currentAngles: currentAngles, config: config)
     }
-
-    // Temporary debug logging — remove after testing
-for (name, angle) in currentAngles {
-  print("[PoseExercise] Angle \(name): \(String(format: "%.1f", angle))°")
-}
-print("[PoseExercise] Detected phase: \(detectedPhase), Current phase: \(_currentPhase)")
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -284,9 +311,7 @@ print("[PoseExercise] Detected phase: \(detectedPhase), Current phase: \(_curren
 
     let cosAngle = max(-1.0, min(1.0, dot / (magA * magC)))
     let angleRad = acos(cosAngle)
-    let angleDeg = angleRad * (180.0 / .pi)
-
-    return angleDeg
+    return angleRad * (180.0 / .pi)
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -296,7 +321,6 @@ print("[PoseExercise] Detected phase: \(detectedPhase), Current phase: \(_curren
   private func determinePhase(from angles: [String: Double], config: ExerciseConfig) -> ExercisePhase {
     for phaseThreshold in config.phases {
       guard let angle = angles[phaseThreshold.angleName] else { continue }
-
       if angle >= phaseThreshold.minAngle && angle <= phaseThreshold.maxAngle {
         return phaseThreshold.phase
       }
@@ -308,7 +332,7 @@ print("[PoseExercise] Detected phase: \(detectedPhase), Current phase: \(_curren
   // MARK: - Rep Counting State Machine
   // ═══════════════════════════════════════════════════════════
 
-private func handlePhaseTransition(from previousPhase: ExercisePhase, to newPhase: ExercisePhase, config: ExerciseConfig) {
+  private func handlePhaseTransition(from previousPhase: ExercisePhase, to newPhase: ExercisePhase, config: ExerciseConfig) {
     guard config.type == .rep else { return }
 
     phaseHistory.append(newPhase)
@@ -523,5 +547,6 @@ private func handlePhaseTransition(from previousPhase: ExercisePhase, to newPhas
     countdownSeconds = 0
     countdownTimer?.invalidate()
     countdownTimer = nil
+    frameCount = 0
   }
 }

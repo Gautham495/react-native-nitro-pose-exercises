@@ -6,21 +6,22 @@
 
 # react-native-nitro-pose-exercises
 
-A **React Native Nitro Module** for real-time, on-device exercise tracking using pose estimation. Built on **MediaPipe Pose Landmarker** and **VisionCamera v5**.
+A **React Native Nitro Module** for real-time, on-device exercise tracking using pose estimation. Uses **OS-native pose detection** — Apple Vision on iOS and Google ML Kit on Android — with **VisionCamera v5**.
 
-- 🏋️ **Rep Counting** — Automatic rep detection with configurable state machines
-- 🧘 **Hold Tracking** — Duration and stability tracking for planks, yoga poses, and isometric holds
-- 📐 **Form Validation** — Real-time form feedback with configurable angle-based rules
-- 💀 **Skeleton Overlay** — Optional Skia-powered skeleton rendering over the camera feed
-- ⚡ **Fully Native** — MediaPipe runs on-device via Nitro Modules, zero JS bridge overhead
+* 🏋️ **Rep Counting** — Automatic rep detection with configurable state machines
+* 🧘 **Hold Tracking** — Duration and stability tracking for planks, yoga poses, and isometric holds
+* 📐 **Form Validation** — Real-time form feedback with configurable angle-based rules
+* 💀 **Skeleton Overlay** — Optional Skia-powered skeleton rendering over the camera feed
+* ⚡ **Fully Native** — OS-level pose detection via Nitro Modules, zero JS bridge overhead
+* 📦 **Zero Model Bundling** — No ML model files to download or ship with your app
 
 ---
 
 > [!IMPORTANT]
 >
-> - Requires React Native **0.76+** with Nitro Modules and VisionCamera **v5**.
-> - Must be tested on a **physical device** — camera + ML inference don't work on simulators.
-> - MediaPipe Pose Landmarker model file (`pose_landmarker_lite.task`) must be bundled with the app.
+> * Requires React Native **0.76+** with Nitro Modules and VisionCamera **v5**.
+> * Must be tested on a **physical device** — camera + ML inference don't work on simulators.
+> * iOS requires **iOS 14+** (Vision body pose API). Android requires **API 23+** (ML Kit).
 
 ---
 
@@ -44,9 +45,10 @@ cd ios && pod install
 ```
 
 > [!NOTE]
-> This package uses **MediaPipe Pose Landmarker** natively on both platforms.
-> iOS uses `MediaPipeTasksVision` via CocoaPods.
-> Android uses `com.google.mediapipe:tasks-vision` via Gradle.
+> This package uses **OS-native pose detection** on both platforms.
+> iOS uses Apple's **Vision framework** (`VNDetectHumanBodyPoseRequest`) — built into iOS, no extra dependencies.
+> Android uses **Google ML Kit Pose Detection** (`com.google.mlkit:pose-detection:18.0.0-beta5`) — model auto-managed via Play Services.
+> **No model files to bundle, no extra downloads, no color format conversions.**
 
 ---
 
@@ -71,30 +73,25 @@ cd ios && pod install
 
 ## 🧠 Overview
 
-| Feature                  | Description                                                               |
-| ------------------------ | ------------------------------------------------------------------------- |
-| **Rep-Based Exercises**  | Cyclic state machine (UP → DOWN → UP = 1 rep). Push-ups, squats, curls.   |
+| Feature | Description |
+| --- | --- |
+| **Rep-Based Exercises** | Cyclic state machine (UP → DOWN → UP = 1 rep). Push-ups, squats, curls. |
 | **Hold-Based Exercises** | Single target pose with duration tracking. Planks, wall sits, yoga poses. |
-| **Flow-Based Exercises** | Ordered sequence of poses. Sun salutation, yoga flows. _(coming soon)_    |
-| **Form Feedback**        | Angle-based rules with throttled real-time callbacks.                     |
-| **Skeleton Overlay**     | 33-point body skeleton drawn over camera via Skia.                        |
-| **Bilateral Tracking**   | Left and right side angles tracked independently.                         |
+| **Flow-Based Exercises** | Ordered sequence of poses. Sun salutation, yoga flows. *(coming soon)* |
+| **Form Feedback** | Angle-based rules with throttled real-time callbacks. |
+| **Skeleton Overlay** | Body skeleton drawn over camera via Skia (19 joints iOS, 33 joints Android). |
+| **Bilateral Tracking** | Left and right side angles tracked independently. |
 
 ---
 
 ## 🔧 Setup
 
-### Model File
+### No Model File Needed
 
-Download the MediaPipe Pose Landmarker model:
+Unlike MediaPipe-based solutions, this library uses OS-native APIs. There is **no model file to download or bundle**.
 
-```
-https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task
-```
-
-**iOS:** Drag `pose_landmarker_lite.task` into your Xcode project (Copy items if needed, add to app target).
-
-**Android:** Place at `android/app/src/main/assets/pose_landmarker_lite.task`
+* **iOS:** Apple Vision is a system framework — it's already on every iPhone running iOS 14+.
+* **Android:** ML Kit manages its own model via Google Play Services — it downloads and updates automatically.
 
 ### Permissions
 
@@ -123,6 +120,26 @@ module.exports = {
     'react-native-reanimated/plugin', // must be last
   ],
 };
+```
+
+### Podspec (for library authors)
+
+The iOS podspec needs the Vision and AVFoundation system frameworks:
+
+```ruby
+s.frameworks = 'Vision', 'AVFoundation'
+```
+
+No CocoaPods dependencies required — Vision is built into iOS.
+
+### Android Gradle (for library authors)
+
+Add ML Kit Pose Detection to `android/build.gradle`:
+
+```groovy
+dependencies {
+    implementation 'com.google.mlkit:pose-detection:18.0.0-beta5'
+}
 ```
 
 ---
@@ -159,10 +176,10 @@ export default function App() {
     if (!hasPermission) requestPermission();
   }, [hasPermission]);
 
-  // Initialize pose engine
+  // Initialize pose engine — modelPath is ignored (OS-native, no model file)
   useEffect(() => {
     async function init() {
-      await nitroPoseExercises.initialize('pose_landmarker_lite.task');
+      await nitroPoseExercises.initialize('');
       nitroPoseExercises.loadExercise(PUSHUP_CONFIG);
 
       nitroPoseExercises.onRepComplete = (data: RepData) => {
@@ -310,7 +327,7 @@ const SKELETON_CONNECTIONS: [number, number][] = [
 ### Lifecycle
 
 ```ts
-// Initialize MediaPipe with model file path
+// Initialize the pose engine (modelPath is ignored — OS-native, no model file needed)
 initialize(modelPath: string): Promise<void>
 
 // Clean up resources
@@ -346,7 +363,7 @@ processFrame(frame: Frame): void
 readonly status: SessionStatus        // 'idle' | 'countdown' | 'active' | 'paused' | 'completed'
 readonly currentPhase: ExercisePhase   // 'up' | 'down' | 'hold' | 'transition' | 'unknown'
 readonly repCount: number
-readonly landmarks: Landmark[]         // 33 body landmarks from MediaPipe
+readonly landmarks: Landmark[]         // Body landmarks (mapped to MediaPipe indices)
 ```
 
 ### Callbacks
@@ -380,9 +397,9 @@ onSessionComplete: ((result: SessionResult) => void) | undefined
 
 ```ts
 {
-  ruleName: string; // e.g. 'hipSag'
-  message: string; // e.g. 'Keep your hips up'
-  severity: FormSeverity; // 'info' | 'warning' | 'error'
+  ruleName: string        // e.g. 'hipSag'
+  message: string         // e.g. 'Keep your hips up'
+  severity: FormSeverity  // 'info' | 'warning' | 'error'
 }
 ```
 
@@ -403,62 +420,88 @@ onSessionComplete: ((result: SessionResult) => void) | undefined
 
 ## 🏋️ Built-In Exercise Configs
 
-### Push-Up (`PUSHUP_CONFIG`)
+### Rep-Based
 
-| Parameter     | Value                                 |
-| ------------- | ------------------------------------- |
-| Type          | `rep`                                 |
-| Primary Angle | Left elbow (shoulder → elbow → wrist) |
-| UP Phase      | Elbow angle 140°–180°                 |
-| DOWN Phase    | Elbow angle 30°–110°                  |
-| Rep Sequence  | UP → DOWN → UP                        |
-| Form Rules    | Hip sag detection, hip pike detection |
+| Config | Exercise | Primary Angle | Form Rules |
+| --- | --- | --- | --- |
+| `PUSHUP_CONFIG` | Push-Up | Elbow (140°–180° up, 30°–110° down) | Hip sag, hip pike |
+| `SQUAT_CONFIG` | Squat | Knee (155°–180° up, 50°–105° down) | Knees caving, leaning forward |
+| `BICEP_CURL_CONFIG` | Bicep Curl | Elbow (150°–180° down, 25°–70° up) | Elbow flare, swinging |
+| `SHOULDER_PRESS_CONFIG` | Shoulder Press | Elbow (155°–180° up, 60°–100° down) | Back arch |
+| `LUNGE_CONFIG` | Lunge | Front knee (155°–180° up, 70°–110° down) | Knee over toe, torso lean |
+| `SITUP_CONFIG` | Sit-Up | Hip (130°–180° down, 40°–90° up) | Neck strain |
+| `TRICEP_DIP_CONFIG` | Tricep Dip | Elbow (150°–180° up, 60°–100° down) | Going too deep |
+
+### Hold-Based
+
+| Config | Exercise | Hold Angle | Duration | Form Rules |
+| --- | --- | --- | --- | --- |
+| `PLANK_CONFIG` | Plank | Hip 155°–180° | 60s | Hip sag, hip pike |
+| `WALL_SIT_CONFIG` | Wall Sit | Knee 80°–110° | 45s | Too high, leaning forward |
+
+### Yoga Poses
+
+| Config | Exercise | Hold Angle | Duration | Form Rules |
+| --- | --- | --- | --- | --- |
+| `TREE_POSE_CONFIG` | Tree Pose (Vrksasana) | Standing leg 165°–180° | 30s | Standing leg bent, leaning torso |
+| `WARRIOR_I_CONFIG` | Warrior I (Virabhadrasana I) | Front knee 80°–110° | 30s | Knee too straight, back leg bent, arms not extended, torso leaning |
+| `WARRIOR_II_CONFIG` | Warrior II (Virabhadrasana II) | Front knee 80°–110° | 30s | Knee too straight, back leg bent, arms drooping |
+| `DOWNWARD_DOG_CONFIG` | Downward Dog (Adho Mukha Svanasana) | Hip 55°–100° | 30s | Arms bent, legs bent, hips too low |
+| `CHAIR_POSE_CONFIG` | Chair Pose (Utkatasana) | Knee 90°–130° | 30s | Knees too straight, leaning forward, arms not up |
+| `COBRA_POSE_CONFIG` | Cobra Pose (Bhujangasana) | Hip extension 120°–170° | 30s | Shoulders tensed, legs bending |
 
 ### Custom Exercise Config
 
 ```ts
 import type { ExerciseConfig } from 'react-native-nitro-pose-exercises';
 
-const SQUAT_CONFIG: ExerciseConfig = {
-  name: 'Squat',
-  type: 'rep',
+const MY_EXERCISE: ExerciseConfig = {
+  name: 'Custom Exercise',
+  type: 'rep',  // 'rep' | 'hold'
   angles: [
-    { name: 'leftKnee', landmarkA: 23, landmarkB: 25, landmarkC: 27 },
-    { name: 'rightKnee', landmarkA: 24, landmarkB: 26, landmarkC: 28 },
+    { name: 'myAngle', landmarkA: 11, landmarkB: 13, landmarkC: 15 },
   ],
   phases: [
-    { phase: 'up', angleName: 'leftKnee', minAngle: 160, maxAngle: 180 },
-    { phase: 'down', angleName: 'leftKnee', minAngle: 50, maxAngle: 110 },
+    { phase: 'up', angleName: 'myAngle', minAngle: 150, maxAngle: 180 },
+    { phase: 'down', angleName: 'myAngle', minAngle: 30, maxAngle: 100 },
   ],
   repSequence: ['up', 'down', 'up'],
-  formRules: [
-    {
-      name: 'kneesCaving',
-      message: 'Push your knees out over your toes',
-      severity: 'warning',
-      angleName: 'leftKnee',
-      minAngle: 50,
-      maxAngle: 180,
-    },
-  ],
+  formRules: [],
   holdDurationMs: 0,
 };
 ```
 
 ---
 
-## 📐 MediaPipe Landmark Index Reference
+## 📐 Landmark Index Reference
 
-| Index | Landmark       | Index | Landmark    |
-| ----- | -------------- | ----- | ----------- |
-| 0     | Nose           | 16    | Right wrist |
-| 11    | Left shoulder  | 23    | Left hip    |
-| 12    | Right shoulder | 24    | Right hip   |
-| 13    | Left elbow     | 25    | Left knee   |
-| 14    | Right elbow    | 26    | Right knee  |
-| 15    | Left wrist     | 27    | Left ankle  |
+Landmarks are mapped to MediaPipe-compatible indices on both platforms. iOS Vision provides 19 joints (all exercise-critical joints covered), Android ML Kit provides the full 33.
 
-Full 33-point reference: [MediaPipe Pose Landmarks](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker#pose_landmarker_model)
+| Index | Landmark | Index | Landmark |
+| --- | --- | --- | --- |
+| 0 | Nose | 16 | Right wrist |
+| 11 | Left shoulder | 23 | Left hip |
+| 12 | Right shoulder | 24 | Right hip |
+| 13 | Left elbow | 25 | Left knee |
+| 14 | Right elbow | 26 | Right knee |
+| 15 | Left wrist | 27 | Left ankle |
+
+**iOS note:** Vision provides 19 joints. Indices not available from Vision (face details 1-10, hands 17-22, feet 29-32) are filled with `visibility: 0` and skipped by the skeleton overlay.
+
+**Android note:** ML Kit provides all 33 landmarks matching MediaPipe indices exactly.
+
+---
+
+## 🏗️ Architecture — OS-Native vs MediaPipe
+
+| | OS-Native (current) | MediaPipe (previous) |
+| --- | --- | --- |
+| **iOS** | Apple Vision framework (built-in) | MediaPipeTasksVision (CocoaPod) |
+| **Android** | Google ML Kit (Play Services) | com.google.mediapipe:tasks-vision |
+| **Model file** | None needed | ~3 MB bundled `.task` file |
+| **Color conversion** | None — takes CVPixelBuffer/ImageProxy directly | BGRA required (iOS), NV21→RGB (Android) |
+| **App size impact** | ~200 KB (Nitro module code only) | ~11-15 MB (SDK + model) |
+| **Updates** | OS/Play Services updates | Manual model file replacement |
 
 ---
 
@@ -466,33 +509,35 @@ Full 33-point reference: [MediaPipe Pose Landmarks](https://ai.google.dev/edge/m
 
 For best results, the camera should see the exerciser from a **side profile**:
 
-| ✅ Good                            | ❌ Bad                   |
-| ---------------------------------- | ------------------------ |
-| Side view, full body visible       | Front-facing view        |
-| Phone at waist height, 6-8 ft away | Ground-level angle       |
-| Well-lit environment               | Heavy glare or backlight |
+| ✅ Good | ❌ Bad |
+| --- | --- |
+| Side view, full body visible | Front-facing view |
+| Phone at waist height, 6-8 ft away | Ground-level angle |
+| Well-lit environment | Heavy glare or backlight |
 
 ---
 
 ## 🧩 Supported Platforms
 
-| Platform             | Status           | Notes                             |
-| -------------------- | ---------------- | --------------------------------- |
-| **iOS**              | ✅ Supported     | Requires physical device, iOS 14+ |
-| **Android**          | ✅ Supported     | Min SDK 24 (Android 7.0)          |
-| **iOS Simulator**    | ❌ Not supported | No camera access                  |
-| **Android Emulator** | ❌ Not supported | No real camera feed               |
+| Platform | Status | Notes |
+| --- | --- | --- |
+| **iOS** | ✅ Supported | Requires physical device, iOS 14+ (Vision body pose) |
+| **Android** | ✅ Supported | API 23+ (ML Kit), Google Play Services required |
+| **iOS Simulator** | ❌ Not supported | No camera access |
+| **Android Emulator** | ❌ Not supported | No real camera feed |
 
 ---
 
 ## 📊 App Size Impact
 
-| Component                    | Size          |
-| ---------------------------- | ------------- |
-| Pose model (Lite)            | ~3 MB         |
-| MediaPipe SDK (per platform) | ~8–12 MB      |
-| Nitro module code            | ~200 KB       |
-| **Total new addition**       | **~11–15 MB** |
+| Component | Size |
+| --- | --- |
+| Nitro module code (Swift + Kotlin) | ~200 KB |
+| ML Kit (Android, via Play Services) | ~0 KB (managed externally) |
+| Vision framework (iOS, built-in) | ~0 KB (system framework) |
+| **Total new addition** | **~200 KB** |
+
+Compared to the MediaPipe approach (~11-15 MB), the OS-native approach adds virtually zero app size.
 
 ---
 
@@ -500,9 +545,9 @@ For best results, the camera should see the exerciser from a **side profile**:
 
 PRs welcome!
 
-- [Development Workflow](CONTRIBUTING.md#development-workflow)
-- [Sending a PR](CONTRIBUTING.md#sending-a-pull-request)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
+* [Development Workflow](CONTRIBUTING.md#development-workflow)
+* [Sending a PR](CONTRIBUTING.md#sending-a-pull-request)
+* [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ---
 
@@ -512,4 +557,4 @@ MIT © [**Gautham Vijayan**](https://gauthamvijay.com)
 
 ---
 
-Made with ❤️ and [**Nitro Modules**](https://nitro.margelo.com) + [**VisionCamera**](https://visioncamera.margelo.com) + [**MediaPipe**](https://ai.google.dev/edge/mediapipe)
+Made with ❤️ and [**Nitro Modules**](https://nitro.margelo.com) + [**VisionCamera**](https://visioncamera.margelo.com) + [**Apple Vision**](https://developer.apple.com/documentation/vision) + [**ML Kit**](https://developers.google.com/ml-kit/vision/pose-detection)

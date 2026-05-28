@@ -53,7 +53,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - NitroPoseExercises (1.0.6):
+  - NitroPoseExercises (1.0.8):
     - hermes-engine
     - MediaPipeTasksVision (~> 0.10.0)
     - NitroModules
@@ -1438,30 +1438,6 @@ PODS:
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-  - react-native-skia (2.6.4):
-    - hermes-engine
-    - RCTRequired
-    - RCTTypeSafety
-    - React
-    - React-callinvoker
-    - React-Core
-    - React-Core-prebuilt
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - ReactNativeDependencies
-    - Yoga
   - React-NativeModulesApple (0.85.0):
     - hermes-engine
     - React-callinvoker
@@ -1921,51 +1897,6 @@ PODS:
     - ReactNativeDependencies
     - RNWorklets
     - Yoga
-  - RNSVG (15.15.5):
-    - hermes-engine
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-Core-prebuilt
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - ReactNativeDependencies
-    - RNSVG/common (= 15.15.5)
-    - Yoga
-  - RNSVG/common (15.15.5):
-    - hermes-engine
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-Core-prebuilt
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - ReactNativeDependencies
-    - Yoga
   - RNWorklets (0.8.3):
     - hermes-engine
     - RCTRequired
@@ -2133,7 +2064,6 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
-  - "react-native-skia (from `../node_modules/@shopify/react-native-skia`)"
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-networking (from `../node_modules/react-native/ReactCommon/react/networking`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
@@ -2169,7 +2099,6 @@ DEPENDENCIES:
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
-  - RNSVG (from `../node_modules/react-native-svg`)
   - RNWorklets (from `../node_modules/react-native-worklets`)
   - VisionCamera (from `../node_modules/react-native-vision-camera`)
   - VisionCameraWorklets (from `../node_modules/react-native-vision-camera-worklets`)
@@ -2264,8 +2193,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   React-microtasksnativemodule:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
-  react-native-skia:
-    :path: "../node_modules/@shopify/react-native-skia"
   React-NativeModulesApple:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios"
   React-networking:
@@ -2336,8 +2263,6 @@ EXTERNAL SOURCES:
     :podspec: "../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
   RNReanimated:
     :path: "../node_modules/react-native-reanimated"
-  RNSVG:
-    :path: "../node_modules/react-native-svg"
   RNWorklets:
     :path: "../node_modules/react-native-worklets"
   VisionCamera:
@@ -2354,7 +2279,7 @@ SPEC CHECKSUMS:
   MediaPipeTasksVision: 1d6c3efa89830a131dbd0dc4fb80dea283fac521
   NitroImage: 33c4698f86b081bd3d0245223f34ea561b0934ea
   NitroModules: d9e08ab81a7b5f6d16acbbc6ea6091e45ce34a9f
-  NitroPoseExercises: 154a686aebac6c066765f1a306bd65ef9e417830
+  NitroPoseExercises: 7f6ede139cb72e0b984f8dda7dee5f367efd859e
   RCTDeprecation: 3bb167081b134461cfeb875ff7ae1945f8635257
   RCTRequired: 74839f55d5058a133a0bc4569b0afec750957f64
   RCTSwiftUI: 87a316382f3eab4dd13d2a0d0fd2adcce917361a
@@ -2391,7 +2316,6 @@ SPEC CHECKSUMS:
   React-logger: ee47d5f3b59a46a006c65038ed5d0b1143e37510
   React-Mapbuffer: 7f8bfbe3fcb2203db4ccb3975414af8cabe4bcd0
   React-microtasksnativemodule: ca1f33f7c98b76d923f550d39631eb4e05fa9aec
-  react-native-skia: 1c97500b89ca2f1e067048918fa11325795686f6
   React-NativeModulesApple: 9c1f8815ebd72cc1c75587fe588513f6dd9cb708
   React-networking: 8f75f882c6794e91e28b458b5bc1461034098c80
   React-oscompat: 5361d0fa7905ba1c3b3c5e7c464d6be9d2d85f4b
@@ -2427,7 +2351,6 @@ SPEC CHECKSUMS:
   ReactCommon: fe2a3af8975e63efa60f95fca8c34dc85deee360
   ReactNativeDependencies: d46026425624bdd69924075df76e425003e8ce5c
   RNReanimated: f735b1747a7a93bda7ca102c6d37a3cf54b6d5e8
-  RNSVG: 0e52210d4d43165e7e2cf9c890a9848b27e513ac
   RNWorklets: 4931990f73bc8f347586918b2e13f11dfadf3b75
   VisionCamera: 7cf2d3ffd098556a9d69f244f5d2fefada941ddd
   VisionCameraWorklets: ba3eeba3a3ddbcd2c5dccbce5ffcd2fde2342814

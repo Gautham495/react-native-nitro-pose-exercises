@@ -1,17 +1,19 @@
 package com.margelo.nitro.nitroposeexercises
 
 import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.media.Image
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-import com.google.mediapipe.framework.image.BitmapImageBuilder
-import com.google.mediapipe.tasks.core.BaseOptions
-import com.google.mediapipe.tasks.vision.core.RunningMode
-import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
-import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker.PoseLandmarkerOptions
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.pose.PoseDetection
+import com.google.mlkit.vision.pose.PoseDetector
+import com.google.mlkit.vision.pose.PoseLandmark
+import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.camera.HybridFrameSpec
-import com.margelo.nitro.camera.public.NativeFrame
+import com.margelo.nitro.camera.NativeFrame
 import kotlin.math.acos
 import kotlin.math.max
 import kotlin.math.min
@@ -19,11 +21,53 @@ import kotlin.math.sqrt
 
 @Keep
 @DoNotStrip
-class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
+class HybridPoseExercise : HybridNitroPoseExercisesSpec() {
 
-  // ─── MediaPipe ──────────────────────────────────────────────
-  private var poseLandmarker: PoseLandmarker? = null
+  // ─── ML Kit ─────────────────────────────────────────────────
+  private var poseDetector: PoseDetector? = null
   private var isInitialized = false
+
+  // ─── Cached Landmarks (ML Kit is async, we cache last result) ──
+  private var cachedLandmarks: Array<Landmark> = emptyArray()
+  private val landmarkLock = Any()
+
+  // ─── Landmark Index Mapping ─────────────────────────────────
+  // ML Kit PoseLandmark type → MediaPipe index that JS configs expect
+  private val mlKitToMediaPipeMap = mapOf(
+    PoseLandmark.NOSE to 0,
+    PoseLandmark.LEFT_EYE_INNER to 1,
+    PoseLandmark.LEFT_EYE to 2,
+    PoseLandmark.LEFT_EYE_OUTER to 3,
+    PoseLandmark.RIGHT_EYE_INNER to 4,
+    PoseLandmark.RIGHT_EYE to 5,
+    PoseLandmark.RIGHT_EYE_OUTER to 6,
+    PoseLandmark.LEFT_EAR to 7,
+    PoseLandmark.RIGHT_EAR to 8,
+    PoseLandmark.LEFT_MOUTH to 9,
+    PoseLandmark.RIGHT_MOUTH to 10,
+    PoseLandmark.LEFT_SHOULDER to 11,
+    PoseLandmark.RIGHT_SHOULDER to 12,
+    PoseLandmark.LEFT_ELBOW to 13,
+    PoseLandmark.RIGHT_ELBOW to 14,
+    PoseLandmark.LEFT_WRIST to 15,
+    PoseLandmark.RIGHT_WRIST to 16,
+    PoseLandmark.LEFT_PINKY to 17,
+    PoseLandmark.RIGHT_PINKY to 18,
+    PoseLandmark.LEFT_INDEX to 19,
+    PoseLandmark.RIGHT_INDEX to 20,
+    PoseLandmark.LEFT_THUMB to 21,
+    PoseLandmark.RIGHT_THUMB to 22,
+    PoseLandmark.LEFT_HIP to 23,
+    PoseLandmark.RIGHT_HIP to 24,
+    PoseLandmark.LEFT_KNEE to 25,
+    PoseLandmark.RIGHT_KNEE to 26,
+    PoseLandmark.LEFT_ANKLE to 27,
+    PoseLandmark.RIGHT_ANKLE to 28,
+    PoseLandmark.LEFT_HEEL to 29,
+    PoseLandmark.RIGHT_HEEL to 30,
+    PoseLandmark.LEFT_FOOT_INDEX to 31,
+    PoseLandmark.RIGHT_FOOT_INDEX to 32,
+  )
 
   // ─── Exercise Config ────────────────────────────────────────
   private var exerciseConfig: ExerciseConfig? = null
@@ -59,7 +103,7 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
   // ─── Pose Tracking ──────────────────────────────────────────
   private var poseWasLost = false
 
-  // ─── Frame Skip ─────────────────────────────────────────────
+  // ─── Frame Throttle ─────────────────────────────────────────
   private var frameCount: Int = 0
   private val processEveryNFrames: Int = 3
 
@@ -80,31 +124,21 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
   // ═══════════════════════════════════════════════════════════
 
   override fun initialize(modelPath: String): Promise<Unit> {
+    // No model file needed — ML Kit downloads/bundles its own model
     return Promise.async {
-      val context = NitroModules.applicationContext
-        ?: throw Error("No ApplicationContext set!")
-
-      val baseOptions = BaseOptions.builder()
-        .setModelAssetPath(modelPath)
+      val options = PoseDetectorOptions.Builder()
+        .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
         .build()
 
-      val options = PoseLandmarkerOptions.builder()
-        .setBaseOptions(baseOptions)
-        .setRunningMode(RunningMode.IMAGE)
-        .setNumPoses(1)
-        .setMinPoseDetectionConfidence(0.5f)
-        .setMinPosePresenceConfidence(0.5f)
-        .setMinTrackingConfidence(0.5f)
-        .build()
-
-      poseLandmarker = PoseLandmarker.createFromOptions(context, options)
+      poseDetector = PoseDetection.getClient(options)
       isInitialized = true
+      println("[PoseExercise] Initialized with ML Kit Pose Detection (no model file needed)")
     }
   }
 
   override fun release() {
-    poseLandmarker?.close()
-    poseLandmarker = null
+    poseDetector?.close()
+    poseDetector = null
     isInitialized = false
     _status = SessionStatus.IDLE
     resetSession()
@@ -154,61 +188,88 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // Frame Processing
+  // Frame Processing (ML Kit — async with cached results)
   // ═══════════════════════════════════════════════════════════
 
   override fun processFrame(frame: HybridFrameSpec) {
     if (_status != SessionStatus.ACTIVE && _status != SessionStatus.COUNTDOWN) return
-    if (!isInitialized || poseLandmarker == null) return
+    if (!isInitialized || poseDetector == null) return
 
+    // Frame throttle
     frameCount++
     if (frameCount % processEveryNFrames != 0) return
 
+    // Get the ImageProxy from VisionCamera frame
+    val nativeFrame = frame as? NativeFrame ?: return
+    val imageProxy = nativeFrame.image ?: return
+
     try {
-      // Get the native buffer from VisionCamera frame
-      val nativeBuffer = frame.getNativeBuffer()
-      val w = frame.width.toInt()
-      val h = frame.height.toInt()
+      // ML Kit takes InputImage directly from ImageProxy — no color conversion needed
+      @androidx.camera.core.ExperimentalGetImage
+      val mediaImage: Image = imageProxy.image ?: return
+      val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
-      // On Android, the pointer is an AHardwareBuffer*
-      // Create a Bitmap and use MediaPipe's BitmapImageBuilder
-      val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-      val mpImage = BitmapImageBuilder(bitmap).build()
-      val result = poseLandmarker!!.detect(mpImage)
+      // ML Kit is async — fire detection, cache result, use cached landmarks for current frame
+      poseDetector!!.process(inputImage)
+        .addOnSuccessListener { pose ->
+          val poseLandmarks = pose.allPoseLandmarks
 
-      if (result.landmarks().isNotEmpty()) {
-        val poseLandmarks = result.landmarks()[0]
+          if (poseLandmarks.isNotEmpty()) {
+            if (poseWasLost) {
+              poseWasLost = false
+              onPoseRegained?.invoke()
+            }
 
-        if (poseWasLost) {
-          poseWasLost = false
-          onPoseRegained?.invoke()
+            // Build landmark array mapped to MediaPipe indices (34 slots)
+            val landmarkArray = Array(34) { Landmark(x = 0.0, y = 0.0, z = 0.0, visibility = 0.0) }
+
+            val imageWidth = inputImage.width.toDouble()
+            val imageHeight = inputImage.height.toDouble()
+
+            for (poseLandmark in poseLandmarks) {
+              val mediaPipeIndex = mlKitToMediaPipeMap[poseLandmark.landmarkType] ?: continue
+              if (mediaPipeIndex >= 34) continue
+
+              // Normalize coordinates to 0-1 range
+              landmarkArray[mediaPipeIndex] = Landmark(
+                x = poseLandmark.position.x.toDouble() / imageWidth,
+                y = poseLandmark.position.y.toDouble() / imageHeight,
+                z = poseLandmark.position3D.z.toDouble(),
+                visibility = poseLandmark.inFrameLikelihood.toDouble()
+              )
+            }
+
+            synchronized(landmarkLock) {
+              cachedLandmarks = landmarkArray
+            }
+          } else {
+            if (!poseWasLost) {
+              poseWasLost = true
+              onPoseLost?.invoke()
+            }
+            synchronized(landmarkLock) {
+              cachedLandmarks = emptyArray()
+            }
+          }
+        }
+        .addOnFailureListener { e ->
+          println("[PoseExercise] ML Kit error: ${e.message}")
         }
 
-        _landmarks = poseLandmarks.map { lm ->
-          Landmark(
-            x = lm.x().toDouble(),
-            y = lm.y().toDouble(),
-            z = lm.z().toDouble(),
-            visibility = (lm.visibility().orElse(0f)).toDouble()
-          )
-        }.toTypedArray()
-
-        if (_status == SessionStatus.ACTIVE) {
-          processExerciseLogic()
-        }
-      } else {
-        if (!poseWasLost) {
-          poseWasLost = true
-          onPoseLost?.invoke()
-        }
-        _landmarks = emptyArray()
+      // Use cached landmarks for exercise logic (from previous frame's detection)
+      val currentLandmarks: Array<Landmark>
+      synchronized(landmarkLock) {
+        currentLandmarks = cachedLandmarks.copyOf()
       }
 
-      bitmap.recycle()
-      nativeBuffer.release()
+      _landmarks = currentLandmarks
+
+      if (currentLandmarks.isNotEmpty() && _status == SessionStatus.ACTIVE) {
+        processExerciseLogic()
+      }
 
     } catch (e: Exception) {
-      // MediaPipe detection failed — skip this frame
+      println("[PoseExercise] Frame processing error: ${e.message}")
     }
   }
 
@@ -229,6 +290,9 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
       val c = angleDef.landmarkC.toInt()
 
       if (a >= _landmarks.size || b >= _landmarks.size || c >= _landmarks.size) continue
+
+      // Only calculate if all three landmarks have reasonable confidence
+      if (_landmarks[a].visibility < 0.3 || _landmarks[b].visibility < 0.3 || _landmarks[c].visibility < 0.3) continue
 
       val angle = calculateAngle(_landmarks[a], _landmarks[b], _landmarks[c])
       currentAngles[angleDef.name] = angle
@@ -365,6 +429,7 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
 
     for (rule in config.formRules) {
       val angle = currentAngles[rule.angleName] ?: continue
+
       val isViolating = angle < rule.minAngle || angle > rule.maxAngle
 
       if (isViolating) {
@@ -407,18 +472,24 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
     }
 
     if (inPosition) {
-      if (holdStartTime == null) holdStartTime = System.currentTimeMillis()
+      if (holdStartTime == null) {
+        holdStartTime = System.currentTimeMillis()
+      }
 
       val elapsed = (System.currentTimeMillis() - holdStartTime!!).toDouble()
       val stability = min(100.0, max(0.0, repFormScore))
 
-      onHoldProgress?.invoke(HoldProgress(
+      val progress = HoldProgress(
         elapsedMs = elapsed,
         targetMs = config.holdDurationMs,
         stability = stability
-      ))
+      )
 
-      if (elapsed >= config.holdDurationMs) completeSession()
+      onHoldProgress?.invoke(progress)
+
+      if (elapsed >= config.holdDurationMs) {
+        completeSession()
+      }
     } else {
       holdStartTime = null
     }
@@ -435,14 +506,16 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
     val avgRepDuration = if (allRepDurations.isEmpty()) 0.0 else allRepDurations.average()
     val avgFormScore = if (allRepFormScores.isEmpty()) 100.0 else allRepFormScores.average()
 
-    onSessionComplete?.invoke(SessionResult(
+    val result = SessionResult(
       totalReps = _repCount,
       totalDurationMs = totalDuration,
       averageRepDurationMs = avgRepDuration,
       averageFormScore = avgFormScore,
       formViolations = sessionFormViolations.toTypedArray(),
       angleHistory = repAngleSnapshots
-    ))
+    )
+
+    onSessionComplete?.invoke(result)
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -482,5 +555,9 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
     poseWasLost = false
     targetReps = 0.0
     countdownSeconds = 0.0
+    frameCount = 0
+    synchronized(landmarkLock) {
+      cachedLandmarks = emptyArray()
+    }
   }
 }

@@ -19,13 +19,14 @@ Pod::Spec.new do |s|
     "cpp/**/*.{hpp,cpp}",
   ]
 
+  s.frameworks = ["AVFoundation", "Vision"]
+
   s.dependency 'React-jsi'
   s.dependency 'React-callinvoker'
 
   load 'nitrogen/generated/ios/NitroPoseExercises+autolinking.rb'
   add_nitrogen_files(s)
 
-  s.dependency 'MediaPipeTasksVision', '~> 0.10.0'
   s.dependency "VisionCamera"
 
   install_modules_dependencies(s)

@@ -120,7 +120,7 @@ repositories {
 dependencies {
   implementation "com.facebook.react:react-android"
   implementation project(":react-native-nitro-modules")
-  implementation 'com.google.mediapipe:tasks-vision:0.10.29'
+  implementation 'com.google.mlkit:pose-detection:18.0.0-beta5'
   implementation project(":react-native-vision-camera")
 }
 
