@@ -8,12 +8,14 @@
 
 A **React Native Nitro Module** for real-time, on-device exercise tracking using pose estimation. Uses **OS-native pose detection** — Apple Vision on iOS and Google ML Kit on Android — with **VisionCamera v5**.
 
-* 🏋️ **Rep Counting** — Automatic rep detection with configurable state machines
+* 🏋️ **38 Built-In Exercises** — Push-ups, squats, deadlifts, yoga poses, and more
+* 🔄 **Rep Counting** — Automatic rep detection with configurable state machines
 * 🧘 **Hold Tracking** — Duration and stability tracking for planks, yoga poses, and isometric holds
-* 📐 **Form Validation** — Real-time form feedback with configurable angle-based rules
-* 💀 **Skeleton Overlay** — Optional Skia-powered skeleton rendering over the camera feed
+* 📐 **Form Validation** — Real-time form feedback with angle-based rules
+* 💀 **Skeleton Overlay** — Skia-powered skeleton with glow effects and live angle badges
 * ⚡ **Fully Native** — OS-level pose detection via Nitro Modules, zero JS bridge overhead
 * 📦 **Zero Model Bundling** — No ML model files to download or ship with your app
+* 🪶 **~200 KB** — Virtually zero app size impact
 
 ---
 
@@ -56,15 +58,15 @@ cd ios && pod install
 
 <table>
   <tr>
-    <th align="center">🍏 iOS Normal Mode</th>
-    <th align="center">🍏 iOS Skia Mode</th>
+    <th align="center">📸 Normal Mode</th>
+    <th align="center">💀 Skeleton + Angle Overlay</th>
   </tr>
   <tr>
     <td align="center">
-    <img alt="android" src="./docs/img/normal-iOS.png"  height="650" width="300"/>
+      <img alt="normal-mode" src="./docs/img/normal.png" height="650" width="300"/>
     </td>
     <td align="center">
-    <img alt="android" src="./docs/img/skia-iOS.png"  height="650" width="300"/>
+      <img alt="skeleton-mode" src="./docs/img/skeleton.png" height="650" width="300"/>
     </td>
   </tr>
 </table>
@@ -75,12 +77,12 @@ cd ios && pod install
 
 | Feature | Description |
 | --- | --- |
-| **Rep-Based Exercises** | Cyclic state machine (UP → DOWN → UP = 1 rep). Push-ups, squats, curls. |
-| **Hold-Based Exercises** | Single target pose with duration tracking. Planks, wall sits, yoga poses. |
-| **Flow-Based Exercises** | Ordered sequence of poses. Sun salutation, yoga flows. *(coming soon)* |
-| **Form Feedback** | Angle-based rules with throttled real-time callbacks. |
-| **Skeleton Overlay** | Body skeleton drawn over camera via Skia (19 joints iOS, 33 joints Android). |
+| **Rep-Based Exercises** | Cyclic state machine (UP → DOWN → UP = 1 rep). Push-ups, squats, curls, and more. |
+| **Hold-Based Exercises** | Single target pose with duration + stability tracking. Planks, wall sits, yoga poses. |
+| **Form Feedback** | Angle-based rules with throttled real-time callbacks. Bad form blocks rep counting. |
+| **Skeleton Overlay** | Glow-effect bones, color-coded joints, and live angle badges drawn over camera via Skia. |
 | **Bilateral Tracking** | Left and right side angles tracked independently. |
+| **Fatigue Guard** | Minimum 800ms per rep prevents false counts. Form score gate rejects bad reps. |
 
 ---
 
@@ -90,8 +92,8 @@ cd ios && pod install
 
 Unlike MediaPipe-based solutions, this library uses OS-native APIs. There is **no model file to download or bundle**.
 
-* **iOS:** Apple Vision is a system framework — it's already on every iPhone running iOS 14+.
-* **Android:** ML Kit manages its own model via Google Play Services — it downloads and updates automatically.
+* **iOS:** Apple Vision is a system framework — already on every iPhone running iOS 14+.
+* **Android:** ML Kit manages its own model via Google Play Services — downloads and updates automatically.
 
 ### Permissions
 
@@ -124,17 +126,13 @@ module.exports = {
 
 ### Podspec (for library authors)
 
-The iOS podspec needs the Vision and AVFoundation system frameworks:
-
 ```ruby
- s.frameworks = ["AVFoundation", "Vision"]
+s.frameworks = ['Vision', 'AVFoundation']
 ```
 
 No CocoaPods dependencies required — Vision is built into iOS.
 
 ### Android Gradle (for library authors)
-
-Add ML Kit Pose Detection to `android/build.gradle`:
 
 ```groovy
 dependencies {
@@ -149,8 +147,8 @@ dependencies {
 ### Basic — Normal Camera (No Skeleton)
 
 ```tsx
-import { useEffect, useCallback, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View, Text } from 'react-native';
 import {
   Camera,
   useCameraDevice,
@@ -162,7 +160,6 @@ import {
   nitroPoseExercises,
   PUSHUP_CONFIG,
   type RepData,
-  type FormFeedback,
   type SessionResult,
 } from 'react-native-nitro-pose-exercises';
 
@@ -176,7 +173,6 @@ export default function App() {
     if (!hasPermission) requestPermission();
   }, [hasPermission]);
 
-  // Initialize pose engine — modelPath is ignored (OS-native, no model file)
   useEffect(() => {
     async function init() {
       await nitroPoseExercises.initialize('');
@@ -184,30 +180,19 @@ export default function App() {
 
       nitroPoseExercises.onRepComplete = (data: RepData) => {
         setRepCount(data.repNumber);
-        console.log(`Rep ${data.repNumber} — form: ${data.formScore}`);
-      };
-
-      nitroPoseExercises.onFormFeedback = (feedback: FormFeedback) => {
-        console.log(`Form: ${feedback.message}`);
       };
 
       nitroPoseExercises.onSessionComplete = (result: SessionResult) => {
-        console.log(
-          `Done! ${result.totalReps} reps, avg form: ${result.averageFormScore}`
-        );
+        console.log(`Done! ${result.totalReps} reps, form: ${result.averageFormScore}`);
       };
 
-      // Start: 10 target reps, 3 second countdown
       nitroPoseExercises.startSession(10, 3);
     }
 
     init();
-    return () => {
-      nitroPoseExercises.release();
-    };
+    return () => { nitroPoseExercises.release(); };
   }, []);
 
-  // Frame processor
   const frameOutput = useFrameOutput({
     pixelFormat: 'rgb',
     onFrame(frame) {
@@ -251,20 +236,55 @@ const styles = StyleSheet.create({
 });
 ```
 
-### Skeleton Overlay — SkiaCamera
+### Skeleton Overlay with Angle Badges — SkiaCamera
+
+> **Critical:** Create all `Skia.Paint()` and `Skia.Font()` objects **outside** the `onFrame` callback. Creating them inside causes memory leaks and crashes within seconds.
 
 ```tsx
-import { SkiaCamera } from 'react-native-vision-camera-skia'
-import { Skia } from '@shopify/react-native-skia'
-import { nitroPoseExercises } from 'react-native-nitro-pose-exercises'
+import { Skia } from '@shopify/react-native-skia';
+import { SkiaCamera } from 'react-native-vision-camera-skia';
+import { nitroPoseExercises } from 'react-native-nitro-pose-exercises';
 
-const SKELETON_CONNECTIONS: [number, number][] = [
-  [11, 12], [11, 23], [12, 24], [23, 24],  // Torso
-  [11, 13], [13, 15],                        // Left arm
-  [12, 14], [14, 16],                        // Right arm
-  [23, 25], [25, 27],                        // Left leg
-  [24, 26], [26, 28],                        // Right leg
-]
+// Create paints ONCE at module level — NEVER inside onFrame
+const GLOW_PAINT = Skia.Paint();
+GLOW_PAINT.setColor(Skia.Color('rgba(0, 255, 102, 0.3)'));
+GLOW_PAINT.setStrokeWidth(14);
+GLOW_PAINT.setStyle(1);
+GLOW_PAINT.setStrokeCap(1);
+GLOW_PAINT.setAntiAlias(true);
+
+const BONE_PAINT = Skia.Paint();
+BONE_PAINT.setColor(Skia.Color('#00FF66'));
+BONE_PAINT.setStrokeWidth(6);
+BONE_PAINT.setStyle(1);
+BONE_PAINT.setStrokeCap(1);
+BONE_PAINT.setAntiAlias(true);
+
+const JOINT_PAINT = Skia.Paint();
+JOINT_PAINT.setColor(Skia.Color('#FF3366'));
+JOINT_PAINT.setStyle(0);
+JOINT_PAINT.setAntiAlias(true);
+
+const KEY_JOINT_PAINT = Skia.Paint();
+KEY_JOINT_PAINT.setColor(Skia.Color('#00FFFF'));
+KEY_JOINT_PAINT.setStyle(0);
+KEY_JOINT_PAINT.setAntiAlias(true);
+
+const ANGLE_BG_PAINT = Skia.Paint();
+ANGLE_BG_PAINT.setColor(Skia.Color('rgba(0, 0, 0, 0.7)'));
+ANGLE_BG_PAINT.setStyle(0);
+
+const ANGLE_TEXT_FONT = Skia.Font(null, 14);
+const ANGLE_TEXT_PAINT = Skia.Paint();
+ANGLE_TEXT_PAINT.setColor(Skia.Color('#FFFFFF'));
+
+const SKELETON_CONNECTIONS = [
+  [11, 12], [11, 23], [12, 24], [23, 24],
+  [11, 13], [13, 15], [12, 14], [14, 16],
+  [23, 25], [25, 27], [24, 26], [26, 28],
+];
+
+const KEY_LANDMARKS = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
 
 <SkiaCamera
   style={StyleSheet.absoluteFill}
@@ -272,49 +292,71 @@ const SKELETON_CONNECTIONS: [number, number][] = [
   device="back"
   pixelFormat="rgb"
   onFrame={(frame, render) => {
-    'worklet'
+    'worklet';
     try {
-      nitroPoseExercises.processFrame(frame)
-      const landmarks = nitroPoseExercises.landmarks
+      nitroPoseExercises.processFrame(frame);
+      const landmarks = nitroPoseExercises.landmarks;
 
       render(({ frameTexture, canvas }) => {
-        canvas.drawImage(frameTexture, 0, 0)
+        canvas.drawImage(frameTexture, 0, 0);
 
         if (landmarks && landmarks.length > 0) {
-          const w = frame.width
-          const h = frame.height
+          const w = frame.width;
+          const h = frame.height;
 
-          // Draw bones
-          const linePaint = Skia.Paint()
-          linePaint.setColor(Skia.Color('#00FF00'))
-          linePaint.setStrokeWidth(4)
-          linePaint.setStyle(1)
-
+          // Glow layer (thick translucent)
           for (const [i, j] of SKELETON_CONNECTIONS) {
             if (i < landmarks.length && j < landmarks.length) {
-              const a = landmarks[i]
-              const b = landmarks[j]
+              const a = landmarks[i];
+              const b = landmarks[j];
               if (a.visibility > 0.5 && b.visibility > 0.5) {
-                canvas.drawLine(a.x * w, a.y * h, b.x * w, b.y * h, linePaint)
+                canvas.drawLine(a.x * w, a.y * h, b.x * w, b.y * h, GLOW_PAINT);
               }
             }
           }
 
-          // Draw joints
-          const jointPaint = Skia.Paint()
-          jointPaint.setColor(Skia.Color('#00FFFF'))
-          jointPaint.setStyle(0)
+          // Solid bones on top
+          for (const [i, j] of SKELETON_CONNECTIONS) {
+            if (i < landmarks.length && j < landmarks.length) {
+              const a = landmarks[i];
+              const b = landmarks[j];
+              if (a.visibility > 0.5 && b.visibility > 0.5) {
+                canvas.drawLine(a.x * w, a.y * h, b.x * w, b.y * h, BONE_PAINT);
+              }
+            }
+          }
 
+          // Joints with glow rings
           for (let idx = 0; idx < landmarks.length; idx++) {
-            const lm = landmarks[idx]
-            if (lm.visibility > 0.5) {
-              canvas.drawCircle(lm.x * w, lm.y * h, 6, jointPaint)
+            const lm = landmarks[idx];
+            if (lm && lm.visibility > 0.5) {
+              const isKey = KEY_LANDMARKS.includes(idx);
+              if (isKey) canvas.drawCircle(lm.x * w, lm.y * h, 12, GLOW_PAINT);
+              canvas.drawCircle(lm.x * w, lm.y * h, isKey ? 8 : 4, isKey ? KEY_JOINT_PAINT : JOINT_PAINT);
+            }
+          }
+
+          // Elbow angle badges
+          for (const [shoulderIdx, elbowIdx, wristIdx] of [[11, 13, 15], [12, 14, 16]]) {
+            const s = landmarks[shoulderIdx];
+            const e = landmarks[elbowIdx];
+            const wr = landmarks[wristIdx];
+            if (s?.visibility > 0.5 && e?.visibility > 0.5 && wr?.visibility > 0.5) {
+              const vaX = s.x - e.x, vaY = s.y - e.y;
+              const vcX = wr.x - e.x, vcY = wr.y - e.y;
+              const dot = vaX * vcX + vaY * vcY;
+              const mag = Math.sqrt(vaX * vaX + vaY * vaY) * Math.sqrt(vcX * vcX + vcY * vcY);
+              const angle = Math.round(Math.acos(Math.max(-1, Math.min(1, dot / mag))) * (180 / Math.PI));
+              const tx = e.x * w + 15;
+              const ty = e.y * h - 10;
+              canvas.drawRoundRect({ x: tx - 4, y: ty - 14, width: 48, height: 20 }, 6, 6, ANGLE_BG_PAINT);
+              canvas.drawText(`${angle}°`, tx, ty, ANGLE_TEXT_PAINT, ANGLE_TEXT_FONT);
             }
           }
         }
-      })
+      });
     } finally {
-      frame.dispose()
+      frame.dispose();
     }
   }}
 />
@@ -337,7 +379,6 @@ release(): void
 ### Exercise Setup
 
 ```ts
-// Load an exercise config (built-in or custom)
 loadExercise(config: ExerciseConfig): void
 ```
 
@@ -353,7 +394,7 @@ stopSession(): void
 ### Frame Processing
 
 ```ts
-// Pass VisionCamera frame for pose detection — call from frame processor
+// Call from VisionCamera frame processor worklet
 processFrame(frame: Frame): void
 ```
 
@@ -363,7 +404,7 @@ processFrame(frame: Frame): void
 readonly status: SessionStatus        // 'idle' | 'countdown' | 'active' | 'paused' | 'completed'
 readonly currentPhase: ExercisePhase   // 'up' | 'down' | 'hold' | 'transition' | 'unknown'
 readonly repCount: number
-readonly landmarks: Landmark[]         // Body landmarks (mapped to MediaPipe indices)
+readonly landmarks: Landmark[]         // Body landmarks mapped to MediaPipe indices
 ```
 
 ### Callbacks
@@ -378,18 +419,16 @@ onPoseRegained: (() => void) | undefined
 onSessionComplete: ((result: SessionResult) => void) | undefined
 ```
 
----
-
 ### Callback Payloads
 
 #### RepData
 
 ```ts
 {
-  repNumber: number       // Current rep count
-  durationMs: number      // Time taken for this rep
-  formScore: number       // 0-100 form quality score
-  angles: AngleSnapshot[] // Joint angles at rep completion
+  repNumber: number
+  durationMs: number
+  formScore: number        // 0-100
+  angles: AngleSnapshot[]  // all tracked angles at rep completion
 }
 ```
 
@@ -397,9 +436,9 @@ onSessionComplete: ((result: SessionResult) => void) | undefined
 
 ```ts
 {
-  ruleName: string        // e.g. 'hipSag'
-  message: string         // e.g. 'Keep your hips up'
-  severity: FormSeverity  // 'info' | 'warning' | 'error'
+  ruleName: string
+  message: string
+  severity: FormSeverity   // 'info' | 'warning' | 'error'
 }
 ```
 
@@ -418,37 +457,68 @@ onSessionComplete: ((result: SessionResult) => void) | undefined
 
 ---
 
-## 🏋️ Built-In Exercise Configs
+## 🏋️ All 38 Built-In Exercise Configs
 
-### Rep-Based
+### Rep-Based: Strength (15 exercises)
 
-| Config | Exercise | Primary Angle | Form Rules |
+| Config | Exercise | Primary Angle | Camera View |
 | --- | --- | --- | --- |
-| `PUSHUP_CONFIG` | Push-Up | Elbow (140°–180° up, 30°–110° down) | Hip sag, hip pike |
-| `SQUAT_CONFIG` | Squat | Knee (155°–180° up, 50°–105° down) | Knees caving, leaning forward |
-| `BICEP_CURL_CONFIG` | Bicep Curl | Elbow (150°–180° down, 25°–70° up) | Elbow flare, swinging |
-| `SHOULDER_PRESS_CONFIG` | Shoulder Press | Elbow (155°–180° up, 60°–100° down) | Back arch |
-| `LUNGE_CONFIG` | Lunge | Front knee (155°–180° up, 70°–110° down) | Knee over toe, torso lean |
-| `SITUP_CONFIG` | Sit-Up | Hip (130°–180° down, 40°–90° up) | Neck strain |
-| `TRICEP_DIP_CONFIG` | Tricep Dip | Elbow (150°–180° up, 60°–100° down) | Going too deep |
+| `PUSHUP_CONFIG` | Push-Up | Elbow 140°–180° / 30°–110° | Side |
+| `PULL_UP_CONFIG` | Pull-Up | Elbow 150°–180° / 40°–90° | Side |
+| `SQUAT_CONFIG` | Squat | Knee 155°–180° / 50°–105° | Side |
+| `SUMO_SQUAT_CONFIG` | Sumo Squat | Knee 155°–180° / 60°–110° | Front |
+| `BICEP_CURL_CONFIG` | Bicep Curl | Elbow 150°–180° / 25°–70° | Side |
+| `SHOULDER_PRESS_CONFIG` | Shoulder Press | Elbow 155°–180° / 60°–100° | Side |
+| `LUNGE_CONFIG` | Lunge | Front knee 155°–180° / 70°–110° | Side |
+| `SIDE_LUNGE_CONFIG` | Side Lunge | Bent knee 155°–180° / 70°–110° | Front |
+| `TRICEP_DIP_CONFIG` | Tricep Dip | Elbow 150°–180° / 60°–100° | Side |
+| `DEADLIFT_CONFIG` | Deadlift | Hip 160°–180° / 60°–120° | Side |
+| `LATERAL_RAISE_CONFIG` | Lateral Raise | Shoulder abduction 5°–30° / 75°–110° | Front |
+| `FRONT_RAISE_CONFIG` | Front Raise | Shoulder flexion 0°–25° / 75°–110° | Side |
+| `CALF_RAISE_CONFIG` | Calf Raise | Ankle 70°–95° / 110°–150° | Side |
+| `OVERARM_REACH_CONFIG` | Overarm Reach | Shoulder abduction 0°–30° / 155°–180° | Front |
+| `HIP_ABDUCTION_CONFIG` | Hip Abduction | Leg spread 0°–15° / 30°–60° | Front |
 
-### Hold-Based
+### Rep-Based: Core (6 exercises)
 
-| Config | Exercise | Hold Angle | Duration | Form Rules |
-| --- | --- | --- | --- | --- |
-| `PLANK_CONFIG` | Plank | Hip 155°–180° | 60s | Hip sag, hip pike |
-| `WALL_SIT_CONFIG` | Wall Sit | Knee 80°–110° | 45s | Too high, leaning forward |
+| Config | Exercise | Primary Angle | Camera View |
+| --- | --- | --- | --- |
+| `SITUP_CONFIG` | Sit-Up | Hip 130°–180° / 40°–90° | Side |
+| `LEG_RAISE_CONFIG` | Leg Raise | Hip 150°–180° / 60°–110° | Side |
+| `V_UP_CONFIG` | V-Up | Hip fold 150°–180° / 30°–80° | Side |
+| `GLUTE_BRIDGE_CONFIG` | Glute Bridge | Hip extension 80°–120° / 155°–180° | Side |
+| `COBRA_WINGS_CONFIG` | Cobra Wings | Hip extension 160°–180° / 120°–155° | Side |
+| `KNEE_RAISE_CONFIG` | Knee Raise | Hip 155°–180° / 60°–110° | Side |
 
-### Yoga Poses
+### Hold-Based: Strength (3 exercises)
 
-| Config | Exercise | Hold Angle | Duration | Form Rules |
-| --- | --- | --- | --- | --- |
-| `TREE_POSE_CONFIG` | Tree Pose (Vrksasana) | Standing leg 165°–180° | 30s | Standing leg bent, leaning torso |
-| `WARRIOR_I_CONFIG` | Warrior I (Virabhadrasana I) | Front knee 80°–110° | 30s | Knee too straight, back leg bent, arms not extended, torso leaning |
-| `WARRIOR_II_CONFIG` | Warrior II (Virabhadrasana II) | Front knee 80°–110° | 30s | Knee too straight, back leg bent, arms drooping |
-| `DOWNWARD_DOG_CONFIG` | Downward Dog (Adho Mukha Svanasana) | Hip 55°–100° | 30s | Arms bent, legs bent, hips too low |
-| `CHAIR_POSE_CONFIG` | Chair Pose (Utkatasana) | Knee 90°–130° | 30s | Knees too straight, leaning forward, arms not up |
-| `COBRA_POSE_CONFIG` | Cobra Pose (Bhujangasana) | Hip extension 120°–170° | 30s | Shoulders tensed, legs bending |
+| Config | Exercise | Hold Angle | Default Duration |
+| --- | --- | --- | --- |
+| `PLANK_CONFIG` | Plank | Hip 155°–180° | 60s |
+| `SIDE_PLANK_CONFIG` | Side Plank | Hip lateral 155°–180° | 30s |
+| `WALL_SIT_CONFIG` | Wall Sit | Knee 80°–110° | 45s |
+
+### Hold-Based: Yoga (14 exercises)
+
+| Config | Exercise | Hold Angle | Default Duration |
+| --- | --- | --- | --- |
+| `MOUNTAIN_POSE_CONFIG` | Mountain Pose (Tadasana) | Knee 170°–180° | 30s |
+| `TREE_POSE_CONFIG` | Tree Pose (Vrksasana) | Standing leg 165°–180° | 30s |
+| `CHAIR_POSE_CONFIG` | Chair Pose (Utkatasana) | Knee 90°–130° | 30s |
+| `WARRIOR_I_CONFIG` | Warrior I (Virabhadrasana I) | Front knee 80°–110° | 30s |
+| `WARRIOR_II_CONFIG` | Warrior II (Virabhadrasana II) | Front knee 80°–110° | 30s |
+| `WARRIOR_III_CONFIG` | Warrior III (Virabhadrasana III) | Hip hinge 70°–110° | 30s |
+| `REVERSE_WARRIOR_CONFIG` | Reverse Warrior | Front knee 80°–110° | 30s |
+| `DOWNWARD_DOG_CONFIG` | Downward Dog (Adho Mukha Svanasana) | Hip 55°–100° | 30s |
+| `COBRA_POSE_CONFIG` | Cobra Pose (Bhujangasana) | Hip extension 120°–170° | 30s |
+| `TRIANGLE_POSE_CONFIG` | Triangle Pose (Trikonasana) | Front leg 160°–180° | 30s |
+| `EXTENDED_SIDE_ANGLE_CONFIG` | Extended Side Angle (Utthita Parsvakonasana) | Front knee 80°–110° | 30s |
+| `BRIDGE_POSE_CONFIG` | Bridge Pose (Setu Bandhasana) | Knee 80°–110° | 30s |
+| `BOAT_POSE_CONFIG` | Boat Pose (Navasana) | Hip flexion 60°–110° | 30s |
+| `CAMEL_POSE_CONFIG` | Camel Pose (Ustrasana) | Hip extension 120°–165° | 30s |
+| `CHILDS_POSE_CONFIG` | Child's Pose (Balasana) | Hip fold 30°–80° | 60s |
+| `BOW_POSE_CONFIG` | Bow Pose (Dhanurasana) | Knee 50°–100° | 30s |
+| `FISH_POSE_CONFIG` | Fish Pose (Matsyasana) | Chest open 130°–170° | 30s |
 
 ### Custom Exercise Config
 
@@ -486,9 +556,21 @@ Landmarks are mapped to MediaPipe-compatible indices on both platforms. iOS Visi
 | 14 | Right elbow | 26 | Right knee |
 | 15 | Left wrist | 27 | Left ankle |
 
-**iOS note:** Vision provides 19 joints. Indices not available from Vision (face details 1-10, hands 17-22, feet 29-32) are filled with `visibility: 0` and skipped by the skeleton overlay.
+**iOS note:** Vision provides 19 joints. Indices not available (face 1-10, hands 17-22, feet 29-32) are filled with `visibility: 0`.
 
 **Android note:** ML Kit provides all 33 landmarks matching MediaPipe indices exactly.
+
+---
+
+## 📏 Camera Angle Guide
+
+| ✅ Good | ❌ Bad |
+| --- | --- |
+| Side view, full body visible | Front-facing view |
+| Phone at waist height, 6-8 ft away | Ground-level angle |
+| Well-lit environment | Heavy glare or backlight |
+
+Each exercise config includes a `cameraAngle` recommendation (`'side'` or `'front'`). Side view works for most exercises. Front view is needed for lateral raises, sumo squats, warrior II, and hip abductions.
 
 ---
 
@@ -499,21 +581,22 @@ Landmarks are mapped to MediaPipe-compatible indices on both platforms. iOS Visi
 | **iOS** | Apple Vision framework (built-in) | MediaPipeTasksVision (CocoaPod) |
 | **Android** | Google ML Kit (Play Services) | com.google.mediapipe:tasks-vision |
 | **Model file** | None needed | ~3 MB bundled `.task` file |
-| **Color conversion** | None — takes CVPixelBuffer/ImageProxy directly | BGRA required (iOS), NV21→RGB (Android) |
+| **Color conversion** | None — takes CVPixelBuffer/InputImage directly | BGRA required (iOS), NV21→RGB (Android) |
 | **App size impact** | ~200 KB (Nitro module code only) | ~11-15 MB (SDK + model) |
 | **Updates** | OS/Play Services updates | Manual model file replacement |
 
 ---
 
-## 📏 Camera Angle Guide
+## 🛡️ Safety Features
 
-For best results, the camera should see the exerciser from a **side profile**:
-
-| ✅ Good | ❌ Bad |
+| Feature | Description |
 | --- | --- |
-| Side view, full body visible | Front-facing view |
-| Phone at waist height, 6-8 ft away | Ground-level angle |
-| Well-lit environment | Heavy glare or backlight |
+| **Min rep duration** | 800ms minimum per rep — prevents false counts from sensor noise |
+| **Form score gate** | Reps with form score below 30/100 are rejected and not counted |
+| **Feedback throttle** | Same form warning fires max once every 5 seconds to avoid UI spam |
+| **Pose lost detection** | `onPoseLost` / `onPoseRegained` callbacks when user exits/enters frame |
+| **Frame throttle** | Processes every 3rd frame to reduce CPU load without losing accuracy |
+| **Visibility filter** | Landmarks with confidence below 0.3 are excluded from angle calculations |
 
 ---
 
@@ -521,8 +604,8 @@ For best results, the camera should see the exerciser from a **side profile**:
 
 | Platform | Status | Notes |
 | --- | --- | --- |
-| **iOS** | ✅ Supported | Requires physical device, iOS 14+ (Vision body pose) |
-| **Android** | ✅ Supported | API 23+ (ML Kit), Google Play Services required |
+| **iOS** | ✅ Supported | Physical device, iOS 14+ (Vision body pose) |
+| **Android** | ✅ Supported | API 23+, Google Play Services required |
 | **iOS Simulator** | ❌ Not supported | No camera access |
 | **Android Emulator** | ❌ Not supported | No real camera feed |
 
@@ -537,13 +620,11 @@ For best results, the camera should see the exerciser from a **side profile**:
 | Vision framework (iOS, built-in) | ~0 KB (system framework) |
 | **Total new addition** | **~200 KB** |
 
-Compared to the MediaPipe approach (~11-15 MB), the OS-native approach adds virtually zero app size.
-
 ---
 
 ## 🤝 Contributing
 
-PRs welcome!
+PRs welcome! Adding a new exercise is as simple as creating a config file — no native code changes needed.
 
 * [Development Workflow](CONTRIBUTING.md#development-workflow)
 * [Sending a PR](CONTRIBUTING.md#sending-a-pull-request)
