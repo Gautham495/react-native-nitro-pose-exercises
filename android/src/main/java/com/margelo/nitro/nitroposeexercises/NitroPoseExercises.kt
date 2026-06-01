@@ -152,10 +152,10 @@ private var postureWasLost = false
     resetSession()
   }
 
-  override fun isReady(): Boolean {
+override fun isReady(): Boolean {
   val config = exerciseConfig ?: return false
   if (_landmarks.isEmpty()) return false
-  return isPostureValid(config.postureFamily)
+  return isPostureValid(config.postureFamily, config.visibilityThreshold)
 }
 
   // ═══════════════════════════════════════════════════════════
@@ -638,12 +638,12 @@ if (!isPostureValid(config.postureFamily, config.visibilityThreshold)) {
     val kneeY = if (kneesVisible) (lk.y + rk.y) / 2 else hipY
     val ankleY = if (anklesVisible) (la.y + ra.y) / 2 else kneeY
 
-   return when (family) {
-  PostureFamily.HORIZONTAL_PRONE, PostureFamily.SUPINE -> {
+return when (family) {
+  PostureFamily.HORIZONTALPRONE, PostureFamily.SUPINE -> {
     val ys = listOf(shoulderY, hipY, ankleY)
     (ys.max() - ys.min()) < 0.25
   }
-  PostureFamily.STANDING_UPRIGHT -> {
+  PostureFamily.STANDINGUPRIGHT -> {
     if (!kneesVisible) false
     else shoulderY < hipY - 0.08 &&
          hipY < kneeY + 0.05 &&
@@ -653,7 +653,7 @@ if (!isPostureValid(config.postureFamily, config.visibilityThreshold)) {
     if (!kneesVisible) false
     else shoulderY < hipY - 0.05 && kotlin.math.abs(hipY - kneeY) < 0.20
   }
-  PostureFamily.SIDE_PLANK -> {
+  PostureFamily.SIDEPLANK -> {
     val ySpread = kotlin.math.abs(shoulderY - hipY)
     val shoulderHipDx = kotlin.math.abs(shoulderX - hipX)
     ySpread < 0.20 && shoulderHipDx < 0.15
