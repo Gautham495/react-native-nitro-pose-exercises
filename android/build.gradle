@@ -43,7 +43,7 @@ android {
   compileSdkVersion getExtOrDefault("compileSdkVersion")
 
   defaultConfig {
-    minSdkVersion getExtOrDefault("minSdkVersion")
+    minSdkVersion 26
     targetSdkVersion getExtOrDefault("targetSdkVersion")
 
     externalNativeBuild {

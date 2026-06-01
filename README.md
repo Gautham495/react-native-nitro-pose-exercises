@@ -64,10 +64,10 @@ cd ios && pod install
   </tr>
   <tr>
     <td align="center">
-      <img alt="normal-mode" src="./docs/img/normal.png" height="650" width="300"/>
+      <img alt="normal-mode" src="https://github.com/user-attachments/assets/762c9b40-ab2e-4e37-ad4c-ac208d555e4f" height="650" width="300"/>
     </td>
     <td align="center">
-      <img alt="skeleton-mode" src="./docs/img/skeleton.png" height="650" width="300"/>
+      <img alt="skeleton-mode" src="https://github.com/user-attachments/assets/762c9b40-ab2e-4e37-ad4c-ac208d555e4f" height="650" width="300"/>
     </td>
   </tr>
 </table>
