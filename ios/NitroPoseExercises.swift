@@ -366,31 +366,31 @@ private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool  {
   let kneeY = kneesVisible ? (lk.y + rk.y) / 2 : hipY
   let ankleY = anklesVisible ? (la.y + ra.y) / 2 : kneeY
 
- switch family {
-case .horizontalProne, .supine:
-  let ys = [shoulderY, hipY, ankleY]
-  return ((ys.max() ?? 0) - (ys.min() ?? 0)) < 0.25
+  switch family {
+  case .horizontalprone, .supine:
+    let ys = [shoulderY, hipY, ankleY]
+    return ((ys.max() ?? 0) - (ys.min() ?? 0)) < 0.25
 
-case .standingUpright:
-  guard kneesVisible else { return false }
-  return shoulderY < hipY - 0.08 && hipY < kneeY + 0.05 && (anklesVisible ? kneeY < ankleY : true)
+  case .standingupright:
+    guard kneesVisible else { return false }
+    return shoulderY < hipY - 0.08 && hipY < kneeY + 0.05 && (anklesVisible ? kneeY < ankleY : true)
 
-case .seated:
-  guard kneesVisible else { return false }
-  return shoulderY < hipY - 0.05 && abs(hipY - kneeY) < 0.20
+  case .seated:
+    guard kneesVisible else { return false }
+    return shoulderY < hipY - 0.05 && Swift.abs(hipY - kneeY) < 0.20
 
-case .sidePlank:
-  let ySpread = abs(shoulderY - hipY)
-  let shoulderHipDx = abs(shoulderX - hipX)
-  return ySpread < 0.20 && shoulderHipDx < 0.15
+  case .sideplank:
+    let ySpread = Swift.abs(shoulderY - hipY)
+    let shoulderHipDx = Swift.abs(shoulderX - hipX)
+    return ySpread < 0.20 && shoulderHipDx < 0.15
 
-case .inverted:
-  guard anklesVisible else { return false }
-  return hipY < shoulderY && hipY < ankleY
+  case .inverted:
+    guard anklesVisible else { return false }
+    return hipY < shoulderY && hipY < ankleY
 
-case .none:
-  return true
-}
+  case .none:
+    return true
+  }
 }
 
   // ═══════════════════════════════════════════════════════════
