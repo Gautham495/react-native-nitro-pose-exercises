@@ -118,7 +118,7 @@ private var postureWasLost = false
   func isReady() throws -> Bool {
   guard let config = exerciseConfig else { return false }
   guard !_landmarks.isEmpty else { return false }
-  return isPostureValid(config.postureFamily)
+return isPostureValid(family: config.postureFamily, threshold: config.visibilityThreshold)
 }
 
   // ═══════════════════════════════════════════════════════════
@@ -268,14 +268,19 @@ private static func cgOrientation(orientation: CameraOrientation, isMirrored: Bo
   // ═══════════════════════════════════════════════════════════
 
 private func processExerciseLogic() {
-
   guard let config = exerciseConfig else { return }
   guard !_landmarks.isEmpty else { return }
+
+  // Hold exercises get 3x more tolerance — stationary poses suffer from
+  // visibility flicker more than active reps.
+  let failureThreshold = config.type == .hold
+    ? postureFailureThreshold * 3
+    : postureFailureThreshold
 
   // Posture gate with hysteresis
   if !isPostureValid(family: config.postureFamily, threshold: config.visibilityThreshold) {
     consecutivePostureFailures += 1
-    if consecutivePostureFailures >= postureFailureThreshold {
+    if consecutivePostureFailures >= failureThreshold {
       if !postureWasLost {
         postureWasLost = true
         onPostureLost?()
@@ -287,67 +292,60 @@ private func processExerciseLogic() {
   }
 
   consecutivePostureFailures = 0
-  
   if postureWasLost {
     postureWasLost = false
     onPostureRegained?()
   }
 
-    var currentAngles: [String: Double] = [:]
-    var angleSnapshots: [AngleSnapshot] = []
+  // Angle calculation
+  let visThreshold = config.visibilityThreshold
+  var currentAngles: [String: Double] = [:]
+  var angleSnapshots: [AngleSnapshot] = []
 
-   let visThreshold = config.visibilityThreshold
+  for angleDef in config.angles {
+    let a = Int(angleDef.landmarkA)
+    let b = Int(angleDef.landmarkB)
+    let c = Int(angleDef.landmarkC)
 
-    for angleDef in config.angles {
-      let a = Int(angleDef.landmarkA)
-      let b = Int(angleDef.landmarkB)
-      let c = Int(angleDef.landmarkC)
+    guard a < _landmarks.count, b < _landmarks.count, c < _landmarks.count else { continue }
 
-      guard a < _landmarks.count, b < _landmarks.count, c < _landmarks.count else { continue }
+    guard _landmarks[a].visibility > visThreshold,
+          _landmarks[b].visibility > visThreshold,
+          _landmarks[c].visibility > visThreshold else { continue }
 
-      guard _landmarks[a].visibility > visThreshold,
-            _landmarks[b].visibility > visThreshold,
-            _landmarks[c].visibility > visThreshold else { continue }
+    let angle = calculateAngle(
+      pointA: _landmarks[a],
+      vertex: _landmarks[b],
+      pointC: _landmarks[c]
+    )
 
-
-      let angle = calculateAngle(
-        pointA: _landmarks[a],
-        vertex: _landmarks[b],
-        pointC: _landmarks[c]
-      )
-
-      currentAngles[angleDef.name] = angle
-      angleSnapshots.append(AngleSnapshot(name: angleDef.name, value: angle))
-    }
-
-    repAngleSnapshots = angleSnapshots
-
-    // Debug logging — uncomment to see angles
-    // for (name, angle) in currentAngles {
-    //   print("[PoseExercise] Angle \(name): \(String(format: "%.1f", angle))°")
-    // }
-
-    let detectedPhase = determinePhase(from: currentAngles, config: config)
-
-    if detectedPhase != _currentPhase && detectedPhase != .unknown {
-      let previousPhase = _currentPhase
-      _currentPhase = detectedPhase
-      onPhaseChange?(detectedPhase)
-      handlePhaseTransition(from: previousPhase, to: detectedPhase, config: config)
-    }
-
-    checkFormRules(currentAngles: currentAngles, config: config)
-
-    if config.type == .hold {
-      handleHoldProgress(currentAngles: currentAngles, config: config)
-    }
+    currentAngles[angleDef.name] = angle
+    angleSnapshots.append(AngleSnapshot(name: angleDef.name, value: angle))
   }
+
+  repAngleSnapshots = angleSnapshots
+
+  let detectedPhase = determinePhase(from: currentAngles, config: config)
+
+  if detectedPhase != _currentPhase && detectedPhase != .unknown {
+    let previousPhase = _currentPhase
+    _currentPhase = detectedPhase
+    onPhaseChange?(detectedPhase)
+    handlePhaseTransition(from: previousPhase, to: detectedPhase, config: config)
+  }
+
+  checkFormRules(currentAngles: currentAngles, config: config)
+
+  if config.type == .hold {
+    handleHoldProgress(currentAngles: currentAngles, config: config)
+  }
+}
 
   // ═══════════════════════════════════════════════════════════
 // MARK: - Posture Gates
 // ═══════════════════════════════════════════════════════════
 
-private func isPostureValid(_ family: String) -> Bool {
+private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool  {
   guard _landmarks.count >= 33 else { return false }
 
   let ls = _landmarks[11], rs = _landmarks[12]
@@ -368,44 +366,31 @@ private func isPostureValid(_ family: String) -> Bool {
   let kneeY = kneesVisible ? (lk.y + rk.y) / 2 : hipY
   let ankleY = anklesVisible ? (la.y + ra.y) / 2 : kneeY
 
-  switch family {
-  case "horizontalProne":
-    let ys = [shoulderY, hipY, ankleY]
-    let spread = (ys.max() ?? 0) - (ys.min() ?? 0)
-    return spread < 0.25
+ switch family {
+case .horizontalProne, .supine:
+  let ys = [shoulderY, hipY, ankleY]
+  return ((ys.max() ?? 0) - (ys.min() ?? 0)) < 0.25
 
-  case "standingUpright":
-    guard kneesVisible else { return false }
-    return shoulderY < hipY - 0.08
-        && hipY < kneeY + 0.05
-        && (anklesVisible ? kneeY < ankleY : true)
+case .standingUpright:
+  guard kneesVisible else { return false }
+  return shoulderY < hipY - 0.08 && hipY < kneeY + 0.05 && (anklesVisible ? kneeY < ankleY : true)
 
-  case "seated":
-    guard kneesVisible else { return false }
-    return shoulderY < hipY - 0.05
-        && abs(hipY - kneeY) < 0.20
+case .seated:
+  guard kneesVisible else { return false }
+  return shoulderY < hipY - 0.05 && abs(hipY - kneeY) < 0.20
 
-  case "supine":
-    let ys = [shoulderY, hipY, ankleY]
-    let spread = (ys.max() ?? 0) - (ys.min() ?? 0)
-    return spread < 0.25
+case .sidePlank:
+  let ySpread = abs(shoulderY - hipY)
+  let shoulderHipDx = abs(shoulderX - hipX)
+  return ySpread < 0.20 && shoulderHipDx < 0.15
 
-  case "sidePlank":
-    let ys = [shoulderY, hipY]
-    let ySpread = (ys.max() ?? 0) - (ys.min() ?? 0)
-    let shoulderHipDx = abs(shoulderX - hipX)
-    return ySpread < 0.20 && shoulderHipDx < 0.15
+case .inverted:
+  guard anklesVisible else { return false }
+  return hipY < shoulderY && hipY < ankleY
 
-  case "inverted":
-    guard anklesVisible else { return false }
-    return hipY < shoulderY && hipY < ankleY
-
-  case "none":
-    return true
-
-  default:
-    return true
-  }
+case .none:
+  return true
+}
 }
 
   // ═══════════════════════════════════════════════════════════
@@ -662,7 +647,7 @@ private func isPostureValid(_ family: String) -> Bool {
     countdownSeconds = 0
     countdownTimer?.invalidate()
     countdownTimer = nil
-    frameCount = 0,
+    frameCount = 0
     consecutivePostureFailures = 0
     postureWasLost = false
   }
