@@ -26,6 +26,7 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
   private var poseDetector: PoseDetector? = null
   private var isInitialized = false
 
+
   // ─── Cached Landmarks (ML Kit is async, we cache last result) ──
   private var cachedLandmarks: Array<Landmark> = emptyArray()
   private val landmarkLock = Any()
@@ -115,6 +116,14 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
   override var onPoseRegained: (() -> Unit)? = null
   override var onSessionComplete: ((result: SessionResult) -> Unit)? = null
 
+  override var onPostureLost: (() -> Unit)? = null
+override var onPostureRegained: (() -> Unit)? = null
+
+  // ─── Posture Gate ──────────────────────────────────────────
+private var consecutivePostureFailures: Int = 0
+private val postureFailureThreshold: Int = 10
+private var postureWasLost = false
+
   // ─── Hold Tracking ──────────────────────────────────────────
   private var holdStartTime: Long? = null
 
@@ -142,6 +151,12 @@ class NitroPoseExercises : HybridNitroPoseExercisesSpec() {
     _status = SessionStatus.IDLE
     resetSession()
   }
+
+  override fun isReady(): Boolean {
+  val config = exerciseConfig ?: return false
+  if (_landmarks.isEmpty()) return false
+  return isPostureValid(config.postureFamily)
+}
 
   // ═══════════════════════════════════════════════════════════
   // Exercise Setup
@@ -201,7 +216,10 @@ override fun processFrame(frame: HybridFrameSpec) {
       val nativeBuffer = frame.getNativeBuffer()
       val bitmap = FrameHelper.hardwareBufferToBitmap(nativeBuffer.pointer) ?: return
 
-      val inputImage = InputImage.fromBitmap(bitmap, 0)
+
+  val rotation = rotationDegreesFromFrame(frame)
+  val inputImage = InputImage.fromBitmap(bitmap, rotation)
+
       val imageWidth = bitmap.width.toDouble()
       val imageHeight = bitmap.height.toDouble()
 
@@ -270,9 +288,29 @@ override fun processFrame(frame: HybridFrameSpec) {
   // Exercise Logic Engine
   // ═══════════════════════════════════════════════════════════
 
-  private fun processExerciseLogic() {
-    val config = exerciseConfig ?: return
-    if (_landmarks.isEmpty()) return
+private fun processExerciseLogic() {
+  val config = exerciseConfig ?: return
+  if (_landmarks.isEmpty()) return
+
+  // Posture gate with hysteresis
+  if (!isPostureValid(config.postureFamily)) {
+    consecutivePostureFailures++
+    if (consecutivePostureFailures >= postureFailureThreshold) {
+      if (!postureWasLost) {
+        postureWasLost = true
+        onPostureLost?.invoke()
+      }
+      _currentPhase = ExercisePhase.UNKNOWN
+      phaseHistory.clear()
+    }
+    return
+  }
+
+  consecutivePostureFailures = 0
+  if (postureWasLost) {
+    postureWasLost = false
+    onPostureRegained?.invoke()
+  }
 
     val currentAngles = mutableMapOf<String, Double>()
     val angleSnapshots = mutableListOf<AngleSnapshot>()
@@ -512,6 +550,83 @@ override fun processFrame(frame: HybridFrameSpec) {
   }
 
   // ═══════════════════════════════════════════════════════════
+// Orientation Helpers
+// ═══════════════════════════════════════════════════════════
+
+private fun rotationDegreesFromFrame(frame: HybridFrameSpec): Int {
+  return when (frame.orientation.name.lowercase()) {
+    "up" -> 0
+    "right" -> 90
+    "down" -> 180
+    "left" -> 270
+    else -> 0
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Posture Gates
+// ═══════════════════════════════════════════════════════════
+
+private func isPostureValid(_ family: String) -> Bool {
+  guard _landmarks.count >= 33 else { return false }
+  
+  let visThreshold = exerciseConfig?.visibilityThreshold ?? 0.3
+  
+  if (_landmarks.size < 33) return false
+
+  val ls = _landmarks[11]; val rs = _landmarks[12]
+  val lh = _landmarks[23]; val rh = _landmarks[24]
+  val lk = _landmarks[25]; val rk = _landmarks[26]
+  val la = _landmarks[27]; val ra = _landmarks[28]
+
+  val keyVisible = ls.visibility > 0.3 && rs.visibility > 0.3 &&
+                   lh.visibility > 0.3 && rh.visibility > 0.3
+  if (!keyVisible) return false
+
+  val shoulderY = (ls.y + rs.y) / 2
+  val hipY = (lh.y + rh.y) / 2
+  val shoulderX = (ls.x + rs.x) / 2
+  val hipX = (lh.x + rh.x) / 2
+
+  val kneesVisible = lk.visibility > 0.3 && rk.visibility > 0.3
+  val anklesVisible = la.visibility > 0.3 && ra.visibility > 0.3
+  val kneeY = if (kneesVisible) (lk.y + rk.y) / 2 else hipY
+  val ankleY = if (anklesVisible) (la.y + ra.y) / 2 else kneeY
+
+  return when (family) {
+    "horizontalProne" -> {
+      val ys = listOf(shoulderY, hipY, ankleY)
+      (ys.max() - ys.min()) < 0.25
+    }
+    "standingUpright" -> {
+      if (!kneesVisible) false
+      else shoulderY < hipY - 0.08 &&
+           hipY < kneeY + 0.05 &&
+           (if (anklesVisible) kneeY < ankleY else true)
+    }
+    "seated" -> {
+      if (!kneesVisible) false
+      else shoulderY < hipY - 0.05 && kotlin.math.abs(hipY - kneeY) < 0.20
+    }
+    "supine" -> {
+      val ys = listOf(shoulderY, hipY, ankleY)
+      (ys.max() - ys.min()) < 0.25
+    }
+    "sidePlank" -> {
+      val ySpread = kotlin.math.abs(shoulderY - hipY)
+      val shoulderHipDx = kotlin.math.abs(shoulderX - hipX)
+      ySpread < 0.20 && shoulderHipDx < 0.15
+    }
+    "inverted" -> {
+      if (!anklesVisible) false
+      else hipY < shoulderY && hipY < ankleY
+    }
+    "none" -> true
+    else -> true
+  }
+}
+
+  // ═══════════════════════════════════════════════════════════
   // Countdown
   // ═══════════════════════════════════════════════════════════
 
@@ -549,6 +664,8 @@ override fun processFrame(frame: HybridFrameSpec) {
     targetReps = 0.0
     countdownSeconds = 0.0
     frameCount = 0
+    consecutivePostureFailures = 0
+postureWasLost = false
     synchronized(landmarkLock) {
       cachedLandmarks = emptyArray()
     }

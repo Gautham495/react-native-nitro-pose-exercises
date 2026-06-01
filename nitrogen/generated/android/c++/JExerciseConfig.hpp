@@ -11,17 +11,21 @@
 #include "ExerciseConfig.hpp"
 
 #include "AngleDefinition.hpp"
+#include "CameraAngleType.hpp"
 #include "ExercisePhase.hpp"
 #include "ExerciseType.hpp"
 #include "FormRule.hpp"
 #include "FormSeverity.hpp"
 #include "JAngleDefinition.hpp"
+#include "JCameraAngleType.hpp"
 #include "JExercisePhase.hpp"
 #include "JExerciseType.hpp"
 #include "JFormRule.hpp"
 #include "JFormSeverity.hpp"
 #include "JPhaseThreshold.hpp"
+#include "JPostureFamily.hpp"
 #include "PhaseThreshold.hpp"
+#include "PostureFamily.hpp"
 #include <string>
 #include <vector>
 
@@ -58,6 +62,12 @@ namespace margelo::nitro::nitroposeexercises {
       jni::local_ref<jni::JArrayClass<JFormRule>> formRules = this->getFieldValue(fieldFormRules);
       static const auto fieldHoldDurationMs = clazz->getField<double>("holdDurationMs");
       double holdDurationMs = this->getFieldValue(fieldHoldDurationMs);
+      static const auto fieldPostureFamily = clazz->getField<JPostureFamily>("postureFamily");
+      jni::local_ref<JPostureFamily> postureFamily = this->getFieldValue(fieldPostureFamily);
+      static const auto fieldVisibilityThreshold = clazz->getField<double>("visibilityThreshold");
+      double visibilityThreshold = this->getFieldValue(fieldVisibilityThreshold);
+      static const auto fieldCameraAngle = clazz->getField<JCameraAngleType>("cameraAngle");
+      jni::local_ref<JCameraAngleType> cameraAngle = this->getFieldValue(fieldCameraAngle);
       return ExerciseConfig(
         name->toStdString(),
         type->toCpp(),
@@ -101,7 +111,10 @@ namespace margelo::nitro::nitroposeexercises {
           }
           return __vector;
         }(formRules),
-        holdDurationMs
+        holdDurationMs,
+        postureFamily->toCpp(),
+        visibilityThreshold,
+        cameraAngle->toCpp()
       );
     }
 
@@ -111,7 +124,7 @@ namespace margelo::nitro::nitroposeexercises {
      */
     [[maybe_unused]]
     static jni::local_ref<JExerciseConfig::javaobject> fromCpp(const ExerciseConfig& value) {
-      using JSignature = JExerciseConfig(jni::alias_ref<jni::JString>, jni::alias_ref<JExerciseType>, jni::alias_ref<jni::JArrayClass<JAngleDefinition>>, jni::alias_ref<jni::JArrayClass<JPhaseThreshold>>, jni::alias_ref<jni::JArrayClass<JExercisePhase>>, jni::alias_ref<jni::JArrayClass<JFormRule>>, double);
+      using JSignature = JExerciseConfig(jni::alias_ref<jni::JString>, jni::alias_ref<JExerciseType>, jni::alias_ref<jni::JArrayClass<JAngleDefinition>>, jni::alias_ref<jni::JArrayClass<JPhaseThreshold>>, jni::alias_ref<jni::JArrayClass<JExercisePhase>>, jni::alias_ref<jni::JArrayClass<JFormRule>>, double, jni::alias_ref<JPostureFamily>, double, jni::alias_ref<JCameraAngleType>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
@@ -158,7 +171,10 @@ namespace margelo::nitro::nitroposeexercises {
           }
           return __array;
         }(value.formRules),
-        value.holdDurationMs
+        value.holdDurationMs,
+        JPostureFamily::fromCpp(value.postureFamily),
+        value.visibilityThreshold,
+        JCameraAngleType::fromCpp(value.cameraAngle)
       );
     }
   };

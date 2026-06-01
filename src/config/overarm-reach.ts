@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const OVERARM_REACH_CONFIG: ExerciseConfig = {
   name: 'Overarm Reach',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'front',
   angles: [
     {
       name: 'leftShoulderAbduction',

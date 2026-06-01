@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const CAMEL_POSE_CONFIG: ExerciseConfig = {
   name: 'Camel Pose (Ustrasana)',
   type: 'hold',
+  postureFamily: 'seated',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'side',
   angles: [
     { name: 'hipExtension', landmarkA: 11, landmarkB: 23, landmarkC: 25 },
     { name: 'kneeAngle', landmarkA: 23, landmarkB: 25, landmarkC: 27 },

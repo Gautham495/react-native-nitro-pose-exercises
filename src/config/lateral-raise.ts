@@ -3,6 +3,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const LATERAL_RAISE_CONFIG: ExerciseConfig = {
   name: 'Lateral Raise',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'front',
   angles: [
     {
       name: 'leftShoulderAbduction',

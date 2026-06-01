@@ -3,6 +3,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const FISH_POSE_CONFIG: ExerciseConfig = {
   name: 'Fish Pose (Matsyasana)',
   type: 'hold',
+  postureFamily: 'supine',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'side',
   angles: [
     { name: 'chestOpen', landmarkA: 11, landmarkB: 23, landmarkC: 25 },
     { name: 'legs', landmarkA: 23, landmarkB: 25, landmarkC: 27 },

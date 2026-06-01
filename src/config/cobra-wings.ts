@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const COBRA_WINGS_CONFIG: ExerciseConfig = {
   name: 'Cobra Wings',
   type: 'rep',
+  postureFamily: 'horizontalProne',
+  visibilityThreshold: 0.25,
+  cameraAngle: 'side',
   angles: [
     { name: 'hipExtension', landmarkA: 11, landmarkB: 23, landmarkC: 25 },
     { name: 'leftShoulder', landmarkA: 23, landmarkB: 11, landmarkC: 13 },

@@ -38,7 +38,16 @@ data class ExerciseConfig(
   val formRules: Array<FormRule>,
   @DoNotStrip
   @Keep
-  val holdDurationMs: Double
+  val holdDurationMs: Double,
+  @DoNotStrip
+  @Keep
+  val postureFamily: PostureFamily,
+  @DoNotStrip
+  @Keep
+  val visibilityThreshold: Double,
+  @DoNotStrip
+  @Keep
+  val cameraAngle: CameraAngleType
 ) {
   /* primary constructor */
 
@@ -52,6 +61,9 @@ data class ExerciseConfig(
       && Objects.deepEquals(this.repSequence, other.repSequence)
       && Objects.deepEquals(this.formRules, other.formRules)
       && Objects.deepEquals(this.holdDurationMs, other.holdDurationMs)
+      && Objects.deepEquals(this.postureFamily, other.postureFamily)
+      && Objects.deepEquals(this.visibilityThreshold, other.visibilityThreshold)
+      && Objects.deepEquals(this.cameraAngle, other.cameraAngle)
   }
 
   override fun hashCode(): Int {
@@ -62,7 +74,10 @@ data class ExerciseConfig(
       phases,
       repSequence,
       formRules,
-      holdDurationMs
+      holdDurationMs,
+      postureFamily,
+      visibilityThreshold,
+      cameraAngle
     ).contentDeepHashCode()
   }
 
@@ -74,8 +89,8 @@ data class ExerciseConfig(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(name: String, type: ExerciseType, angles: Array<AngleDefinition>, phases: Array<PhaseThreshold>, repSequence: Array<ExercisePhase>, formRules: Array<FormRule>, holdDurationMs: Double): ExerciseConfig {
-      return ExerciseConfig(name, type, angles, phases, repSequence, formRules, holdDurationMs)
+    private fun fromCpp(name: String, type: ExerciseType, angles: Array<AngleDefinition>, phases: Array<PhaseThreshold>, repSequence: Array<ExercisePhase>, formRules: Array<FormRule>, holdDurationMs: Double, postureFamily: PostureFamily, visibilityThreshold: Double, cameraAngle: CameraAngleType): ExerciseConfig {
+      return ExerciseConfig(name, type, angles, phases, repSequence, formRules, holdDurationMs, postureFamily, visibilityThreshold, cameraAngle)
     }
   }
 }

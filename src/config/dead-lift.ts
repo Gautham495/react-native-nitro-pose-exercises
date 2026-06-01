@@ -3,6 +3,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const DEADLIFT_CONFIG: ExerciseConfig = {
   name: 'Deadlift',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'side',
   angles: [
     { name: 'leftHip', landmarkA: 11, landmarkB: 23, landmarkC: 25 },
     { name: 'rightHip', landmarkA: 12, landmarkB: 24, landmarkC: 26 },

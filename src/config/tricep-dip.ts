@@ -8,6 +8,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const TRICEP_DIP_CONFIG: ExerciseConfig = {
   name: 'Tricep Dip',
   type: 'rep',
+  postureFamily: 'horizontalProne',
+  visibilityThreshold: 0.2, // ← add
+  cameraAngle: 'front',
   angles: [
     {
       name: 'leftElbow',

@@ -8,6 +8,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const WALL_SIT_CONFIG: ExerciseConfig = {
   name: 'Wall Sit',
   type: 'hold',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'side',
   angles: [
     {
       name: 'leftKnee',

@@ -38,6 +38,10 @@ namespace margelo::nitro::nitroposeexercises { struct PhaseThreshold; }
 namespace margelo::nitro::nitroposeexercises { enum class ExercisePhase; }
 // Forward declaration of `FormRule` to properly resolve imports.
 namespace margelo::nitro::nitroposeexercises { struct FormRule; }
+// Forward declaration of `PostureFamily` to properly resolve imports.
+namespace margelo::nitro::nitroposeexercises { enum class PostureFamily; }
+// Forward declaration of `CameraAngleType` to properly resolve imports.
+namespace margelo::nitro::nitroposeexercises { enum class CameraAngleType; }
 
 #include <string>
 #include "ExerciseType.hpp"
@@ -46,6 +50,8 @@ namespace margelo::nitro::nitroposeexercises { struct FormRule; }
 #include "PhaseThreshold.hpp"
 #include "ExercisePhase.hpp"
 #include "FormRule.hpp"
+#include "PostureFamily.hpp"
+#include "CameraAngleType.hpp"
 
 namespace margelo::nitro::nitroposeexercises {
 
@@ -61,10 +67,13 @@ namespace margelo::nitro::nitroposeexercises {
     std::vector<ExercisePhase> repSequence     SWIFT_PRIVATE;
     std::vector<FormRule> formRules     SWIFT_PRIVATE;
     double holdDurationMs     SWIFT_PRIVATE;
+    PostureFamily postureFamily     SWIFT_PRIVATE;
+    double visibilityThreshold     SWIFT_PRIVATE;
+    CameraAngleType cameraAngle     SWIFT_PRIVATE;
 
   public:
     ExerciseConfig() = default;
-    explicit ExerciseConfig(std::string name, ExerciseType type, std::vector<AngleDefinition> angles, std::vector<PhaseThreshold> phases, std::vector<ExercisePhase> repSequence, std::vector<FormRule> formRules, double holdDurationMs): name(name), type(type), angles(angles), phases(phases), repSequence(repSequence), formRules(formRules), holdDurationMs(holdDurationMs) {}
+    explicit ExerciseConfig(std::string name, ExerciseType type, std::vector<AngleDefinition> angles, std::vector<PhaseThreshold> phases, std::vector<ExercisePhase> repSequence, std::vector<FormRule> formRules, double holdDurationMs, PostureFamily postureFamily, double visibilityThreshold, CameraAngleType cameraAngle): name(name), type(type), angles(angles), phases(phases), repSequence(repSequence), formRules(formRules), holdDurationMs(holdDurationMs), postureFamily(postureFamily), visibilityThreshold(visibilityThreshold), cameraAngle(cameraAngle) {}
 
   public:
     friend bool operator==(const ExerciseConfig& lhs, const ExerciseConfig& rhs) = default;
@@ -86,7 +95,10 @@ namespace margelo::nitro {
         JSIConverter<std::vector<margelo::nitro::nitroposeexercises::PhaseThreshold>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "phases"))),
         JSIConverter<std::vector<margelo::nitro::nitroposeexercises::ExercisePhase>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "repSequence"))),
         JSIConverter<std::vector<margelo::nitro::nitroposeexercises::FormRule>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "formRules"))),
-        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "holdDurationMs")))
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "holdDurationMs"))),
+        JSIConverter<margelo::nitro::nitroposeexercises::PostureFamily>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "postureFamily"))),
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "visibilityThreshold"))),
+        JSIConverter<margelo::nitro::nitroposeexercises::CameraAngleType>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "cameraAngle")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::nitroposeexercises::ExerciseConfig& arg) {
@@ -98,6 +110,9 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "repSequence"), JSIConverter<std::vector<margelo::nitro::nitroposeexercises::ExercisePhase>>::toJSI(runtime, arg.repSequence));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "formRules"), JSIConverter<std::vector<margelo::nitro::nitroposeexercises::FormRule>>::toJSI(runtime, arg.formRules));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "holdDurationMs"), JSIConverter<double>::toJSI(runtime, arg.holdDurationMs));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "postureFamily"), JSIConverter<margelo::nitro::nitroposeexercises::PostureFamily>::toJSI(runtime, arg.postureFamily));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "visibilityThreshold"), JSIConverter<double>::toJSI(runtime, arg.visibilityThreshold));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "cameraAngle"), JSIConverter<margelo::nitro::nitroposeexercises::CameraAngleType>::toJSI(runtime, arg.cameraAngle));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -115,6 +130,9 @@ namespace margelo::nitro {
       if (!JSIConverter<std::vector<margelo::nitro::nitroposeexercises::ExercisePhase>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "repSequence")))) return false;
       if (!JSIConverter<std::vector<margelo::nitro::nitroposeexercises::FormRule>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "formRules")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "holdDurationMs")))) return false;
+      if (!JSIConverter<margelo::nitro::nitroposeexercises::PostureFamily>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "postureFamily")))) return false;
+      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "visibilityThreshold")))) return false;
+      if (!JSIConverter<margelo::nitro::nitroposeexercises::CameraAngleType>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "cameraAngle")))) return false;
       return true;
     }
   };

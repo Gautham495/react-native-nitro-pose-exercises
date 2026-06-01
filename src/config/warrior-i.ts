@@ -9,6 +9,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const WARRIOR_I_CONFIG: ExerciseConfig = {
   name: 'Warrior I (Virabhadrasana I)',
   type: 'hold',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.4,
+  cameraAngle: 'side',
   angles: [
     {
       name: 'frontKnee',

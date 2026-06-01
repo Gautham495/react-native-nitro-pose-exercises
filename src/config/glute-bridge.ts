@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const GLUTE_BRIDGE_CONFIG: ExerciseConfig = {
   name: 'Glute Bridge',
   type: 'rep',
+  postureFamily: 'supine',
+  visibilityThreshold: 0.25,
+  cameraAngle: 'side',
   angles: [
     { name: 'hipExtension', landmarkA: 11, landmarkB: 23, landmarkC: 25 },
     { name: 'kneeAngle', landmarkA: 23, landmarkB: 25, landmarkC: 27 },

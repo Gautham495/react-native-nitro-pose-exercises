@@ -35,6 +35,10 @@ namespace margelo::nitro::nitroposeexercises { struct AngleDefinition; }
 namespace margelo::nitro::nitroposeexercises { struct PhaseThreshold; }
 // Forward declaration of `FormRule` to properly resolve imports.
 namespace margelo::nitro::nitroposeexercises { struct FormRule; }
+// Forward declaration of `PostureFamily` to properly resolve imports.
+namespace margelo::nitro::nitroposeexercises { enum class PostureFamily; }
+// Forward declaration of `CameraAngleType` to properly resolve imports.
+namespace margelo::nitro::nitroposeexercises { enum class CameraAngleType; }
 // Forward declaration of `HybridFrameSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridFrameSpec; }
 
@@ -80,6 +84,10 @@ namespace margelo::nitro::camera { class HybridFrameSpec; }
 #include "JPhaseThreshold.hpp"
 #include "FormRule.hpp"
 #include "JFormRule.hpp"
+#include "PostureFamily.hpp"
+#include "JPostureFamily.hpp"
+#include "CameraAngleType.hpp"
+#include "JCameraAngleType.hpp"
 #include <memory>
 #include <VisionCamera/HybridFrameSpec.hpp>
 #include <VisionCamera/JHybridFrameSpec.hpp>
@@ -238,6 +246,40 @@ namespace margelo::nitro::nitroposeexercises {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_SessionResult::javaobject> /* onSessionComplete */)>("setOnSessionComplete_cxx");
     method(_javaPart, onSessionComplete.has_value() ? JFunc_void_SessionResult_cxx::fromCpp(onSessionComplete.value()) : nullptr);
   }
+  std::optional<std::function<void()>> JHybridNitroPoseExercisesSpec::getOnPostureLost() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JFunc_void::javaobject>()>("getOnPostureLost_cxx");
+    auto __result = method(_javaPart);
+    return __result != nullptr ? std::make_optional([&]() -> std::function<void()> {
+      if (__result->isInstanceOf(JFunc_void_cxx::javaClassStatic())) [[likely]] {
+        auto downcast = jni::static_ref_cast<JFunc_void_cxx::javaobject>(__result);
+        return downcast->cthis()->getFunction();
+      } else {
+        auto __resultRef = jni::make_global(__result);
+        return JNICallable<JFunc_void, void()>(std::move(__resultRef));
+      }
+    }()) : std::nullopt;
+  }
+  void JHybridNitroPoseExercisesSpec::setOnPostureLost(const std::optional<std::function<void()>>& onPostureLost) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void::javaobject> /* onPostureLost */)>("setOnPostureLost_cxx");
+    method(_javaPart, onPostureLost.has_value() ? JFunc_void_cxx::fromCpp(onPostureLost.value()) : nullptr);
+  }
+  std::optional<std::function<void()>> JHybridNitroPoseExercisesSpec::getOnPostureRegained() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JFunc_void::javaobject>()>("getOnPostureRegained_cxx");
+    auto __result = method(_javaPart);
+    return __result != nullptr ? std::make_optional([&]() -> std::function<void()> {
+      if (__result->isInstanceOf(JFunc_void_cxx::javaClassStatic())) [[likely]] {
+        auto downcast = jni::static_ref_cast<JFunc_void_cxx::javaobject>(__result);
+        return downcast->cthis()->getFunction();
+      } else {
+        auto __resultRef = jni::make_global(__result);
+        return JNICallable<JFunc_void, void()>(std::move(__resultRef));
+      }
+    }()) : std::nullopt;
+  }
+  void JHybridNitroPoseExercisesSpec::setOnPostureRegained(const std::optional<std::function<void()>>& onPostureRegained) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void::javaobject> /* onPostureRegained */)>("setOnPostureRegained_cxx");
+    method(_javaPart, onPostureRegained.has_value() ? JFunc_void_cxx::fromCpp(onPostureRegained.value()) : nullptr);
+  }
   ExercisePhase JHybridNitroPoseExercisesSpec::getCurrentPhase() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JExercisePhase>()>("getCurrentPhase");
     auto __result = method(_javaPart);
@@ -306,6 +348,11 @@ namespace margelo::nitro::nitroposeexercises {
   void JHybridNitroPoseExercisesSpec::stopSession() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("stopSession");
     method(_javaPart);
+  }
+  bool JHybridNitroPoseExercisesSpec::isReady() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jboolean()>("isReady");
+    auto __result = method(_javaPart);
+    return static_cast<bool>(__result);
   }
 
 } // namespace margelo::nitro::nitroposeexercises

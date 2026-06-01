@@ -12,6 +12,7 @@ A **React Native Nitro Module** for real-time, on-device exercise tracking using
 * 🔄 **Rep Counting** — Automatic rep detection with configurable state machines
 * 🧘 **Hold Tracking** — Duration and stability tracking for planks, yoga poses, and isometric holds
 * 📐 **Form Validation** — Real-time form feedback with angle-based rules
+* 🚦 **Posture Gating** — Refuses to count reps unless the user is in valid posture; "Get in position" feedback before sessions start
 * 💀 **Skeleton Overlay** — Skia-powered skeleton with glow effects and live angle badges
 * ⚡ **Fully Native** — OS-level pose detection via Nitro Modules, zero JS bridge overhead
 * 📦 **Zero Model Bundling** — No ML model files to download or ship with your app
@@ -79,6 +80,7 @@ cd ios && pod install
 | --- | --- |
 | **Rep-Based Exercises** | Cyclic state machine (UP → DOWN → UP = 1 rep). Push-ups, squats, curls, and more. |
 | **Hold-Based Exercises** | Single target pose with duration + stability tracking. Planks, wall sits, yoga poses. |
+| **Posture Gate** | Family-based posture validation. Refuses to start or count reps until user is in correct position (e.g. horizontal for pushups, upright for squats). |
 | **Form Feedback** | Angle-based rules with throttled real-time callbacks. Bad form blocks rep counting. |
 | **Skeleton Overlay** | Glow-effect bones, color-coded joints, and live angle badges drawn over camera via Skia. |
 | **Bilateral Tracking** | Left and right side angles tracked independently. |
@@ -236,132 +238,6 @@ const styles = StyleSheet.create({
 });
 ```
 
-### Skeleton Overlay with Angle Badges — SkiaCamera
-
-> **Critical:** Create all `Skia.Paint()` and `Skia.Font()` objects **outside** the `onFrame` callback. Creating them inside causes memory leaks and crashes within seconds.
-
-```tsx
-import { Skia } from '@shopify/react-native-skia';
-import { SkiaCamera } from 'react-native-vision-camera-skia';
-import { nitroPoseExercises } from 'react-native-nitro-pose-exercises';
-
-// Create paints ONCE at module level — NEVER inside onFrame
-const GLOW_PAINT = Skia.Paint();
-GLOW_PAINT.setColor(Skia.Color('rgba(0, 255, 102, 0.3)'));
-GLOW_PAINT.setStrokeWidth(14);
-GLOW_PAINT.setStyle(1);
-GLOW_PAINT.setStrokeCap(1);
-GLOW_PAINT.setAntiAlias(true);
-
-const BONE_PAINT = Skia.Paint();
-BONE_PAINT.setColor(Skia.Color('#00FF66'));
-BONE_PAINT.setStrokeWidth(6);
-BONE_PAINT.setStyle(1);
-BONE_PAINT.setStrokeCap(1);
-BONE_PAINT.setAntiAlias(true);
-
-const JOINT_PAINT = Skia.Paint();
-JOINT_PAINT.setColor(Skia.Color('#FF3366'));
-JOINT_PAINT.setStyle(0);
-JOINT_PAINT.setAntiAlias(true);
-
-const KEY_JOINT_PAINT = Skia.Paint();
-KEY_JOINT_PAINT.setColor(Skia.Color('#00FFFF'));
-KEY_JOINT_PAINT.setStyle(0);
-KEY_JOINT_PAINT.setAntiAlias(true);
-
-const ANGLE_BG_PAINT = Skia.Paint();
-ANGLE_BG_PAINT.setColor(Skia.Color('rgba(0, 0, 0, 0.7)'));
-ANGLE_BG_PAINT.setStyle(0);
-
-const ANGLE_TEXT_FONT = Skia.Font(null, 14);
-const ANGLE_TEXT_PAINT = Skia.Paint();
-ANGLE_TEXT_PAINT.setColor(Skia.Color('#FFFFFF'));
-
-const SKELETON_CONNECTIONS = [
-  [11, 12], [11, 23], [12, 24], [23, 24],
-  [11, 13], [13, 15], [12, 14], [14, 16],
-  [23, 25], [25, 27], [24, 26], [26, 28],
-];
-
-const KEY_LANDMARKS = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
-
-<SkiaCamera
-  style={StyleSheet.absoluteFill}
-  isActive={true}
-  device="back"
-  pixelFormat="rgb"
-  onFrame={(frame, render) => {
-    'worklet';
-    try {
-      nitroPoseExercises.processFrame(frame);
-      const landmarks = nitroPoseExercises.landmarks;
-
-      render(({ frameTexture, canvas }) => {
-        canvas.drawImage(frameTexture, 0, 0);
-
-        if (landmarks && landmarks.length > 0) {
-          const w = frame.width;
-          const h = frame.height;
-
-          // Glow layer (thick translucent)
-          for (const [i, j] of SKELETON_CONNECTIONS) {
-            if (i < landmarks.length && j < landmarks.length) {
-              const a = landmarks[i];
-              const b = landmarks[j];
-              if (a.visibility > 0.5 && b.visibility > 0.5) {
-                canvas.drawLine(a.x * w, a.y * h, b.x * w, b.y * h, GLOW_PAINT);
-              }
-            }
-          }
-
-          // Solid bones on top
-          for (const [i, j] of SKELETON_CONNECTIONS) {
-            if (i < landmarks.length && j < landmarks.length) {
-              const a = landmarks[i];
-              const b = landmarks[j];
-              if (a.visibility > 0.5 && b.visibility > 0.5) {
-                canvas.drawLine(a.x * w, a.y * h, b.x * w, b.y * h, BONE_PAINT);
-              }
-            }
-          }
-
-          // Joints with glow rings
-          for (let idx = 0; idx < landmarks.length; idx++) {
-            const lm = landmarks[idx];
-            if (lm && lm.visibility > 0.5) {
-              const isKey = KEY_LANDMARKS.includes(idx);
-              if (isKey) canvas.drawCircle(lm.x * w, lm.y * h, 12, GLOW_PAINT);
-              canvas.drawCircle(lm.x * w, lm.y * h, isKey ? 8 : 4, isKey ? KEY_JOINT_PAINT : JOINT_PAINT);
-            }
-          }
-
-          // Elbow angle badges
-          for (const [shoulderIdx, elbowIdx, wristIdx] of [[11, 13, 15], [12, 14, 16]]) {
-            const s = landmarks[shoulderIdx];
-            const e = landmarks[elbowIdx];
-            const wr = landmarks[wristIdx];
-            if (s?.visibility > 0.5 && e?.visibility > 0.5 && wr?.visibility > 0.5) {
-              const vaX = s.x - e.x, vaY = s.y - e.y;
-              const vcX = wr.x - e.x, vcY = wr.y - e.y;
-              const dot = vaX * vcX + vaY * vcY;
-              const mag = Math.sqrt(vaX * vaX + vaY * vaY) * Math.sqrt(vcX * vcX + vcY * vcY);
-              const angle = Math.round(Math.acos(Math.max(-1, Math.min(1, dot / mag))) * (180 / Math.PI));
-              const tx = e.x * w + 15;
-              const ty = e.y * h - 10;
-              canvas.drawRoundRect({ x: tx - 4, y: ty - 14, width: 48, height: 20 }, 6, 6, ANGLE_BG_PAINT);
-              canvas.drawText(`${angle}°`, tx, ty, ANGLE_TEXT_PAINT, ANGLE_TEXT_FONT);
-            }
-          }
-        }
-      });
-    } finally {
-      frame.dispose();
-    }
-  }}
-/>
-```
-
 ---
 
 ## 🧩 API Reference
@@ -389,6 +265,9 @@ startSession(targetReps: number, countdownSeconds: number): void
 pauseSession(): void
 resumeSession(): void
 stopSession(): void
+// Returns true if the user is currently in valid posture for the loaded exercise.
+// Poll this before starting a session, e.g. show "Get in position" until ready.
+isReady(): boolean
 ```
 
 ### Frame Processing
@@ -416,6 +295,8 @@ onFormFeedback: ((feedback: FormFeedback) => void) | undefined
 onHoldProgress: ((progress: HoldProgress) => void) | undefined
 onPoseLost: (() => void) | undefined
 onPoseRegained: (() => void) | undefined
+onPostureLost: (() => void) | undefined        
+onPostureRegained: (() => void) | undefined
 onSessionComplete: ((result: SessionResult) => void) | undefined
 ```
 
@@ -454,6 +335,74 @@ onSessionComplete: ((result: SessionResult) => void) | undefined
   angleHistory: AngleSnapshot[]
 }
 ```
+---
+
+## 🚦 Posture Gating
+
+Each exercise config declares a **posture family** that defines what body position is required before reps are counted. This prevents false counts — e.g. waving your arm while standing won't count as a push-up.
+
+### Posture Families
+
+| Family | Description | Used For |
+| --- | --- | --- |
+| `horizontalProne` | Body horizontal, face down. Shoulders, hips, ankles in a horizontal band. | Push-ups, planks, cobra, mountain climbers |
+| `standingUpright` | Standing, shoulders above hips above knees. | Squats, lunges, curls, presses, most yoga poses |
+| `seated` | Hips near knees, shoulders above hips. | Boat pose, seated yoga, child's pose |
+| `supine` | Body horizontal, face up. | Sit-ups, glute bridge, leg raises |
+| `sidePlank` | Body horizontal, rotated to one side. | Side plank, side leg raises |
+| `inverted` | Hips higher than shoulders and ankles. | Downward dog, handstand |
+| `none` | No posture gating. | Custom or unconstrained exercises |
+
+### Flow
+
+loadExercise(config)  →  poll isReady()  →  user gets in position  →
+isReady() returns true  →  startSession()  →  reps counted normally
+↓
+if posture breaks mid-session
+→ onPostureLost fires
+→ phase detection pauses
+→ in-progress rep discarded
+↓
+user re-enters position
+→ onPostureRegained fires
+→ counting resumes
+
+### Example: Wait for Position Before Starting
+
+```tsx
+const [isInPosition, setIsInPosition] = useState(false);
+
+useEffect(() => {
+// Wait for the user to get into position before starting
+const checkInterval = setInterval(() => {
+  if (nitroPoseExercises.isReady()) {
+    clearInterval(checkInterval);
+    nitroPoseExercises.startSession(10, 3);
+  }
+}, 300);
+  return () => clearInterval(interval);
+}, []);
+
+useEffect(() => {
+  nitroPoseExercises.onPostureLost = () => {
+    setMessage('Get back into position');
+  };
+  nitroPoseExercises.onPostureRegained = () => {
+    setMessage('');
+  };
+}, []);
+
+return (
+  <>
+    {!isInPosition && <Text>Get into push-up position</Text>}
+    {isInPosition && <Text>Hold still — starting...</Text>}
+  </>
+);
+```
+
+### Tuning
+
+Posture gates use a **10-frame hysteresis** (about 1 second at 30fps with frame throttling) — single-frame failures don't pause the session. This prevents flicker from momentary occlusion or visibility drops.
 
 ---
 
@@ -528,6 +477,7 @@ import type { ExerciseConfig } from 'react-native-nitro-pose-exercises';
 const MY_EXERCISE: ExerciseConfig = {
   name: 'Custom Exercise',
   type: 'rep',  // 'rep' | 'hold'
+  postureFamily: 'standingUpright',  // ← required: see table above
   angles: [
     { name: 'myAngle', landmarkA: 11, landmarkB: 13, landmarkC: 15 },
   ],
@@ -597,6 +547,8 @@ Each exercise config includes a `cameraAngle` recommendation (`'side'` or `'fron
 | **Pose lost detection** | `onPoseLost` / `onPoseRegained` callbacks when user exits/enters frame |
 | **Frame throttle** | Processes every 3rd frame to reduce CPU load without losing accuracy |
 | **Visibility filter** | Landmarks with confidence below 0.3 are excluded from angle calculations |
+| **Posture entry gate** | Sessions don't start counting until `isReady()` returns true |
+| **Posture hysteresis** | 10 consecutive failed frames required to fire `onPostureLost` — prevents flicker |
 
 ---
 

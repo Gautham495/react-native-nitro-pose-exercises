@@ -29,6 +29,10 @@ namespace margelo::nitro::nitroposeexercises {
       prototype.registerHybridSetter("onPoseRegained", &HybridNitroPoseExercisesSpec::setOnPoseRegained);
       prototype.registerHybridGetter("onSessionComplete", &HybridNitroPoseExercisesSpec::getOnSessionComplete);
       prototype.registerHybridSetter("onSessionComplete", &HybridNitroPoseExercisesSpec::setOnSessionComplete);
+      prototype.registerHybridGetter("onPostureLost", &HybridNitroPoseExercisesSpec::getOnPostureLost);
+      prototype.registerHybridSetter("onPostureLost", &HybridNitroPoseExercisesSpec::setOnPostureLost);
+      prototype.registerHybridGetter("onPostureRegained", &HybridNitroPoseExercisesSpec::getOnPostureRegained);
+      prototype.registerHybridSetter("onPostureRegained", &HybridNitroPoseExercisesSpec::setOnPostureRegained);
       prototype.registerHybridGetter("currentPhase", &HybridNitroPoseExercisesSpec::getCurrentPhase);
       prototype.registerHybridGetter("repCount", &HybridNitroPoseExercisesSpec::getRepCount);
       prototype.registerHybridGetter("landmarks", &HybridNitroPoseExercisesSpec::getLandmarks);
@@ -40,6 +44,7 @@ namespace margelo::nitro::nitroposeexercises {
       prototype.registerHybridMethod("pauseSession", &HybridNitroPoseExercisesSpec::pauseSession);
       prototype.registerHybridMethod("resumeSession", &HybridNitroPoseExercisesSpec::resumeSession);
       prototype.registerHybridMethod("stopSession", &HybridNitroPoseExercisesSpec::stopSession);
+      prototype.registerHybridMethod("isReady", &HybridNitroPoseExercisesSpec::isReady);
     });
   }
 

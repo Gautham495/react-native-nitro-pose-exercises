@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const REVERSE_WARRIOR_CONFIG: ExerciseConfig = {
   name: 'Reverse Warrior (Viparita Virabhadrasana)',
   type: 'hold',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.4,
+  cameraAngle: 'side',
   angles: [
     { name: 'frontKnee', landmarkA: 23, landmarkB: 25, landmarkC: 27 },
     { name: 'backLeg', landmarkA: 24, landmarkB: 26, landmarkC: 28 },

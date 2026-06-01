@@ -9,6 +9,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const DOWNWARD_DOG_CONFIG: ExerciseConfig = {
   name: 'Downward Dog (Adho Mukha Svanasana)',
   type: 'hold',
+  postureFamily: 'inverted',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'side',
   angles: [
     {
       name: 'hipAngle',

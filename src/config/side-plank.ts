@@ -3,6 +3,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const SIDE_PLANK_CONFIG: ExerciseConfig = {
   name: 'Side Plank',
   type: 'hold',
+  postureFamily: 'sidePlank',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'side',
   angles: [
     { name: 'hipLateral', landmarkA: 11, landmarkB: 23, landmarkC: 27 },
     { name: 'supportArm', landmarkA: 11, landmarkB: 13, landmarkC: 15 },

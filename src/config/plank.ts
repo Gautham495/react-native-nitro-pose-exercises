@@ -8,6 +8,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const PLANK_CONFIG: ExerciseConfig = {
   name: 'Plank',
   type: 'hold',
+  postureFamily: 'horizontalProne',
+  visibilityThreshold: 0.25,
+  cameraAngle: 'side',
   angles: [
     {
       name: 'leftHip',

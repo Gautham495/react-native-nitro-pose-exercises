@@ -8,6 +8,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const CHAIR_POSE_CONFIG: ExerciseConfig = {
   name: 'Chair Pose (Utkatasana)',
   type: 'hold',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.4,
+  cameraAngle: 'side',
   angles: [
     {
       name: 'leftKnee',

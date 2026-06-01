@@ -8,6 +8,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const SQUAT_CONFIG: ExerciseConfig = {
   name: 'Squat',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.2,
+  cameraAngle: 'front',
   angles: [
     {
       name: 'leftKnee',

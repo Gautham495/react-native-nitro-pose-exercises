@@ -3,6 +3,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const BRIDGE_POSE_CONFIG: ExerciseConfig = {
   name: 'Bridge Pose (Setu Bandhasana)',
   type: 'hold',
+  postureFamily: 'supine',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'side',
   angles: [
     { name: 'hipExtension', landmarkA: 11, landmarkB: 23, landmarkC: 25 },
     { name: 'kneeAngle', landmarkA: 23, landmarkB: 25, landmarkC: 27 },

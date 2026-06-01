@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const EXTENDED_SIDE_ANGLE_CONFIG: ExerciseConfig = {
   name: 'Extended Side Angle (Utthita Parsvakonasana)',
   type: 'hold',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.4,
+  cameraAngle: 'front',
   angles: [
     { name: 'frontKnee', landmarkA: 23, landmarkB: 25, landmarkC: 27 },
     { name: 'backLeg', landmarkA: 24, landmarkB: 26, landmarkC: 28 },

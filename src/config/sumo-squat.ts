@@ -1,7 +1,11 @@
 import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
+
 export const SUMO_SQUAT_CONFIG: ExerciseConfig = {
   name: 'Sumo Squat',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.2,
+  cameraAngle: 'front',
   angles: [
     { name: 'leftKnee', landmarkA: 23, landmarkB: 25, landmarkC: 27 },
     { name: 'rightKnee', landmarkA: 24, landmarkB: 26, landmarkC: 28 },

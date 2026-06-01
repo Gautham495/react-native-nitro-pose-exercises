@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const WARRIOR_III_CONFIG: ExerciseConfig = {
   name: 'Warrior III (Virabhadrasana III)',
   type: 'hold',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.4,
+  cameraAngle: 'side',
   angles: [
     { name: 'standingLeg', landmarkA: 23, landmarkB: 25, landmarkC: 27 },
     { name: 'hipHinge', landmarkA: 11, landmarkB: 23, landmarkC: 25 },

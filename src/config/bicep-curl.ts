@@ -7,6 +7,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const BICEP_CURL_CONFIG: ExerciseConfig = {
   name: 'Bicep Curl',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.2,
+  cameraAngle: 'front',
   angles: [
     {
       name: 'leftElbow',

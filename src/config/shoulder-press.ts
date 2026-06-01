@@ -8,6 +8,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const SHOULDER_PRESS_CONFIG: ExerciseConfig = {
   name: 'Shoulder Press',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.2,
+  cameraAngle: 'front',
   angles: [
     {
       name: 'leftElbow',

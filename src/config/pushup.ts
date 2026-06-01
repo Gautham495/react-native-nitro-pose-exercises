@@ -9,6 +9,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const PUSHUP_CONFIG: ExerciseConfig = {
   name: 'Push-Up',
   type: 'rep',
+  postureFamily: 'horizontalProne',
+  visibilityThreshold: 0.2, // ← add
+  cameraAngle: 'front',
   angles: [
     {
       name: 'leftElbow',

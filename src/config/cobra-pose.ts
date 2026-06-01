@@ -8,6 +8,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const COBRA_POSE_CONFIG: ExerciseConfig = {
   name: 'Cobra Pose (Bhujangasana)',
   type: 'hold',
+  postureFamily: 'horizontalProne',
+  visibilityThreshold: 0.25,
+  cameraAngle: 'side',
   angles: [
     {
       name: 'leftElbow',

@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const KNEE_RAISE_CONFIG: ExerciseConfig = {
   name: 'Knee Raise',
   type: 'rep',
+  postureFamily: 'supine',
+  visibilityThreshold: 0.25,
+  cameraAngle: 'side',
   angles: [
     { name: 'leftHip', landmarkA: 11, landmarkB: 23, landmarkC: 25 },
     { name: 'rightHip', landmarkA: 12, landmarkB: 24, landmarkC: 26 },

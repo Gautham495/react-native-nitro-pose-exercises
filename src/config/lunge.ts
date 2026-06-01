@@ -8,6 +8,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const LUNGE_CONFIG: ExerciseConfig = {
   name: 'Lunge',
   type: 'rep',
+  postureFamily: 'supine',
+  visibilityThreshold: 0.25,
+  cameraAngle: 'side',
   angles: [
     {
       name: 'frontKnee',

@@ -18,7 +18,7 @@ public extension ExerciseConfig {
   /**
    * Create a new instance of `ExerciseConfig`.
    */
-  init(name: String, type: ExerciseType, angles: [AngleDefinition], phases: [PhaseThreshold], repSequence: [ExercisePhase], formRules: [FormRule], holdDurationMs: Double) {
+  init(name: String, type: ExerciseType, angles: [AngleDefinition], phases: [PhaseThreshold], repSequence: [ExercisePhase], formRules: [FormRule], holdDurationMs: Double, postureFamily: PostureFamily, visibilityThreshold: Double, cameraAngle: CameraAngleType) {
     self.init(std.string(name), type, { () -> bridge.std__vector_AngleDefinition_ in
       var __vector = bridge.create_std__vector_AngleDefinition_(angles.count)
       for __item in angles {
@@ -43,7 +43,7 @@ public extension ExerciseConfig {
         __vector.push_back(__item)
       }
       return __vector
-    }(), holdDurationMs)
+    }(), holdDurationMs, postureFamily, visibilityThreshold, cameraAngle)
   }
 
   @inline(__always)
@@ -79,5 +79,20 @@ public extension ExerciseConfig {
   @inline(__always)
   var holdDurationMs: Double {
     return self.__holdDurationMs
+  }
+  
+  @inline(__always)
+  var postureFamily: PostureFamily {
+    return self.__postureFamily
+  }
+  
+  @inline(__always)
+  var visibilityThreshold: Double {
+    return self.__visibilityThreshold
+  }
+  
+  @inline(__always)
+  var cameraAngle: CameraAngleType {
+    return self.__cameraAngle
   }
 }

@@ -70,6 +70,11 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
   private var allRepDurations: [Double] = []
   private var allRepFormScores: [Double] = []
 
+  // ─── Posture Gate ──────────────────────────────────────────
+private var consecutivePostureFailures: Int = 0
+private let postureFailureThreshold: Int = 10  // ~1s at 30fps with throttle=3
+private var postureWasLost = false
+
   // ─── Pose Tracking ──────────────────────────────────────────
   private var poseWasLost = false
 
@@ -85,6 +90,8 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
   var onPoseLost: (() -> Void)?
   var onPoseRegained: (() -> Void)?
   var onSessionComplete: ((_ result: SessionResult) -> Void)?
+  var onPostureLost: (() -> Void)?
+  var onPostureRegained: (() -> Void)?
 
   // ─── Hold Tracking ──────────────────────────────────────────
   private var holdStartTime: Date?
@@ -107,6 +114,12 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
     _status = .idle
     resetSession()
   }
+
+  func isReady() throws -> Bool {
+  guard let config = exerciseConfig else { return false }
+  guard !_landmarks.isEmpty else { return false }
+  return isPostureValid(config.postureFamily)
+}
 
   // ═══════════════════════════════════════════════════════════
   // MARK: - Exercise Setup
@@ -151,12 +164,23 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
     completeSession()
   }
 
+private static func cgOrientation(orientation: CameraOrientation, isMirrored: Bool) -> CGImagePropertyOrientation {
+  switch orientation {
+  case .up:    return isMirrored ? .upMirrored    : .up
+  case .down:  return isMirrored ? .downMirrored  : .down
+  case .left:  return isMirrored ? .leftMirrored  : .left
+  case .right: return isMirrored ? .rightMirrored : .right
+  @unknown default: return .up
+  }
+}
+
   // ═══════════════════════════════════════════════════════════
   // MARK: - Frame Processing (Apple Vision)
   // ═══════════════════════════════════════════════════════════
 
   func processFrame(frame: any HybridFrameSpec) throws {
     guard _status == .active || _status == .countdown else { return }
+
     guard isInitialized else { return }
 
     // Frame throttle
@@ -173,9 +197,11 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
     // Create Vision request
     let request = VNDetectHumanBodyPoseRequest()
 
-    // Run synchronously on this frame processor thread
-    let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+      print("[PoseExercise] orientation=\(frame.orientation) isMirrored=\(frame.isMirrored) type=\(type(of: frame.orientation))")
 
+      let cgOrient = Self.cgOrientation(orientation: frame.orientation, isMirrored: frame.isMirrored)
+      let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: cgOrient, options: [:])
+      
     do {
       try handler.perform([request])
 
@@ -241,12 +267,36 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
   // MARK: - Exercise Logic Engine
   // ═══════════════════════════════════════════════════════════
 
-  private func processExerciseLogic() {
-    guard let config = exerciseConfig else { return }
-    guard !_landmarks.isEmpty else { return }
+private func processExerciseLogic() {
+
+  guard let config = exerciseConfig else { return }
+  guard !_landmarks.isEmpty else { return }
+
+  // Posture gate with hysteresis
+  if !isPostureValid(family: config.postureFamily, threshold: config.visibilityThreshold) {
+    consecutivePostureFailures += 1
+    if consecutivePostureFailures >= postureFailureThreshold {
+      if !postureWasLost {
+        postureWasLost = true
+        onPostureLost?()
+      }
+      _currentPhase = .unknown
+      phaseHistory = []
+    }
+    return
+  }
+
+  consecutivePostureFailures = 0
+  
+  if postureWasLost {
+    postureWasLost = false
+    onPostureRegained?()
+  }
 
     var currentAngles: [String: Double] = [:]
     var angleSnapshots: [AngleSnapshot] = []
+
+   let visThreshold = config.visibilityThreshold
 
     for angleDef in config.angles {
       let a = Int(angleDef.landmarkA)
@@ -255,10 +305,10 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
 
       guard a < _landmarks.count, b < _landmarks.count, c < _landmarks.count else { continue }
 
-      // Only calculate if all three landmarks have reasonable confidence
-      guard _landmarks[a].visibility > 0.3,
-            _landmarks[b].visibility > 0.3,
-            _landmarks[c].visibility > 0.3 else { continue }
+      guard _landmarks[a].visibility > visThreshold,
+            _landmarks[b].visibility > visThreshold,
+            _landmarks[c].visibility > visThreshold else { continue }
+
 
       let angle = calculateAngle(
         pointA: _landmarks[a],
@@ -292,6 +342,71 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
       handleHoldProgress(currentAngles: currentAngles, config: config)
     }
   }
+
+  // ═══════════════════════════════════════════════════════════
+// MARK: - Posture Gates
+// ═══════════════════════════════════════════════════════════
+
+private func isPostureValid(_ family: String) -> Bool {
+  guard _landmarks.count >= 33 else { return false }
+
+  let ls = _landmarks[11], rs = _landmarks[12]
+  let lh = _landmarks[23], rh = _landmarks[24]
+  let lk = _landmarks[25], rk = _landmarks[26]
+  let la = _landmarks[27], ra = _landmarks[28]
+
+  let key = [ls, rs, lh, rh]
+  guard key.allSatisfy({ $0.visibility > 0.3 }) else { return false }
+
+  let shoulderY = (ls.y + rs.y) / 2
+  let hipY = (lh.y + rh.y) / 2
+  let shoulderX = (ls.x + rs.x) / 2
+  let hipX = (lh.x + rh.x) / 2
+
+  let kneesVisible = lk.visibility > 0.3 && rk.visibility > 0.3
+  let anklesVisible = la.visibility > 0.3 && ra.visibility > 0.3
+  let kneeY = kneesVisible ? (lk.y + rk.y) / 2 : hipY
+  let ankleY = anklesVisible ? (la.y + ra.y) / 2 : kneeY
+
+  switch family {
+  case "horizontalProne":
+    let ys = [shoulderY, hipY, ankleY]
+    let spread = (ys.max() ?? 0) - (ys.min() ?? 0)
+    return spread < 0.25
+
+  case "standingUpright":
+    guard kneesVisible else { return false }
+    return shoulderY < hipY - 0.08
+        && hipY < kneeY + 0.05
+        && (anklesVisible ? kneeY < ankleY : true)
+
+  case "seated":
+    guard kneesVisible else { return false }
+    return shoulderY < hipY - 0.05
+        && abs(hipY - kneeY) < 0.20
+
+  case "supine":
+    let ys = [shoulderY, hipY, ankleY]
+    let spread = (ys.max() ?? 0) - (ys.min() ?? 0)
+    return spread < 0.25
+
+  case "sidePlank":
+    let ys = [shoulderY, hipY]
+    let ySpread = (ys.max() ?? 0) - (ys.min() ?? 0)
+    let shoulderHipDx = abs(shoulderX - hipX)
+    return ySpread < 0.20 && shoulderHipDx < 0.15
+
+  case "inverted":
+    guard anklesVisible else { return false }
+    return hipY < shoulderY && hipY < ankleY
+
+  case "none":
+    return true
+
+  default:
+    return true
+  }
+}
 
   // ═══════════════════════════════════════════════════════════
   // MARK: - Angle Calculation
@@ -547,6 +662,8 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
     countdownSeconds = 0
     countdownTimer?.invalidate()
     countdownTimer = nil
-    frameCount = 0
+    frameCount = 0,
+    consecutivePostureFailures = 0
+    postureWasLost = false
   }
 }

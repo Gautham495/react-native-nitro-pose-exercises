@@ -8,6 +8,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const TREE_POSE_CONFIG: ExerciseConfig = {
   name: 'Tree Pose (Vrksasana)',
   type: 'hold',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.4,
+  cameraAngle: 'front',
   angles: [
     {
       name: 'standingLeg',

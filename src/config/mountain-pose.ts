@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const MOUNTAIN_POSE_CONFIG: ExerciseConfig = {
   name: 'Mountain Pose (Tadasana)',
   type: 'hold',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.4,
+  cameraAngle: 'front',
   angles: [
     { name: 'leftKnee', landmarkA: 23, landmarkB: 25, landmarkC: 27 },
     { name: 'hipAngle', landmarkA: 11, landmarkB: 23, landmarkC: 25 },

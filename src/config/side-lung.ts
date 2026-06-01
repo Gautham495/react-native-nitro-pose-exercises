@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const SIDE_LUNGE_CONFIG: ExerciseConfig = {
   name: 'Side Lunge',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.2,
+  cameraAngle: 'front',
   angles: [
     { name: 'bentKnee', landmarkA: 23, landmarkB: 25, landmarkC: 27 },
     { name: 'straightLeg', landmarkA: 24, landmarkB: 26, landmarkC: 28 },

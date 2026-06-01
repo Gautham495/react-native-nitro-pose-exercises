@@ -90,6 +90,10 @@ namespace margelo::nitro::nitroposeexercises {
       virtual void setOnPoseRegained(const std::optional<std::function<void()>>& onPoseRegained) = 0;
       virtual std::optional<std::function<void(const SessionResult& /* result */)>> getOnSessionComplete() = 0;
       virtual void setOnSessionComplete(const std::optional<std::function<void(const SessionResult& /* result */)>>& onSessionComplete) = 0;
+      virtual std::optional<std::function<void()>> getOnPostureLost() = 0;
+      virtual void setOnPostureLost(const std::optional<std::function<void()>>& onPostureLost) = 0;
+      virtual std::optional<std::function<void()>> getOnPostureRegained() = 0;
+      virtual void setOnPostureRegained(const std::optional<std::function<void()>>& onPostureRegained) = 0;
       virtual ExercisePhase getCurrentPhase() = 0;
       virtual double getRepCount() = 0;
       virtual std::vector<Landmark> getLandmarks() = 0;
@@ -104,6 +108,7 @@ namespace margelo::nitro::nitroposeexercises {
       virtual void pauseSession() = 0;
       virtual void resumeSession() = 0;
       virtual void stopSession() = 0;
+      virtual bool isReady() = 0;
 
     protected:
       // Hybrid Setup

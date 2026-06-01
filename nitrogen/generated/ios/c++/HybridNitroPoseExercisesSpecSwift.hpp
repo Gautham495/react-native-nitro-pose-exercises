@@ -40,6 +40,10 @@ namespace margelo::nitro::nitroposeexercises { struct AngleDefinition; }
 namespace margelo::nitro::nitroposeexercises { struct PhaseThreshold; }
 // Forward declaration of `FormRule` to properly resolve imports.
 namespace margelo::nitro::nitroposeexercises { struct FormRule; }
+// Forward declaration of `PostureFamily` to properly resolve imports.
+namespace margelo::nitro::nitroposeexercises { enum class PostureFamily; }
+// Forward declaration of `CameraAngleType` to properly resolve imports.
+namespace margelo::nitro::nitroposeexercises { enum class CameraAngleType; }
 // Forward declaration of `HybridFrameSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridFrameSpec; }
 
@@ -62,6 +66,8 @@ namespace margelo::nitro::camera { class HybridFrameSpec; }
 #include "AngleDefinition.hpp"
 #include "PhaseThreshold.hpp"
 #include "FormRule.hpp"
+#include "PostureFamily.hpp"
+#include "CameraAngleType.hpp"
 #include <memory>
 #include <VisionCamera/HybridFrameSpec.hpp>
 
@@ -164,6 +170,20 @@ namespace margelo::nitro::nitroposeexercises {
     inline void setOnSessionComplete(const std::optional<std::function<void(const SessionResult& /* result */)>>& onSessionComplete) noexcept override {
       _swiftPart.setOnSessionComplete(onSessionComplete);
     }
+    inline std::optional<std::function<void()>> getOnPostureLost() noexcept override {
+      auto __result = _swiftPart.getOnPostureLost();
+      return __result;
+    }
+    inline void setOnPostureLost(const std::optional<std::function<void()>>& onPostureLost) noexcept override {
+      _swiftPart.setOnPostureLost(onPostureLost);
+    }
+    inline std::optional<std::function<void()>> getOnPostureRegained() noexcept override {
+      auto __result = _swiftPart.getOnPostureRegained();
+      return __result;
+    }
+    inline void setOnPostureRegained(const std::optional<std::function<void()>>& onPostureRegained) noexcept override {
+      _swiftPart.setOnPostureRegained(onPostureRegained);
+    }
     inline ExercisePhase getCurrentPhase() noexcept override {
       auto __result = _swiftPart.getCurrentPhase();
       return static_cast<ExercisePhase>(__result);
@@ -227,6 +247,14 @@ namespace margelo::nitro::nitroposeexercises {
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
+    }
+    inline bool isReady() override {
+      auto __result = _swiftPart.isReady();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
     }
 
   private:

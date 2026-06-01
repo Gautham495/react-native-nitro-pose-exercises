@@ -129,6 +129,34 @@ abstract class HybridNitroPoseExercisesSpec: HybridObject() {
       onSessionComplete = value?.let { it }
     }
   
+  abstract var onPostureLost: (() -> Unit)?
+  
+  private var onPostureLost_cxx: Func_void?
+    @Keep
+    @DoNotStrip
+    get() {
+      return onPostureLost?.let { Func_void_java(it) }
+    }
+    @Keep
+    @DoNotStrip
+    set(value) {
+      onPostureLost = value?.let { it }
+    }
+  
+  abstract var onPostureRegained: (() -> Unit)?
+  
+  private var onPostureRegained_cxx: Func_void?
+    @Keep
+    @DoNotStrip
+    get() {
+      return onPostureRegained?.let { Func_void_java(it) }
+    }
+    @Keep
+    @DoNotStrip
+    set(value) {
+      onPostureRegained = value?.let { it }
+    }
+  
   @get:DoNotStrip
   @get:Keep
   abstract val currentPhase: ExercisePhase
@@ -173,6 +201,10 @@ abstract class HybridNitroPoseExercisesSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun stopSession(): Unit
+  
+  @DoNotStrip
+  @Keep
+  abstract fun isReady(): Boolean
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

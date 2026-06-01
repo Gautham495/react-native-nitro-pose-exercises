@@ -3,6 +3,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const CALF_RAISE_CONFIG: ExerciseConfig = {
   name: 'Calf Raise',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.2,
+  cameraAngle: 'front',
   angles: [
     { name: 'leftAnkle', landmarkA: 25, landmarkB: 27, landmarkC: 31 },
     { name: 'rightAnkle', landmarkA: 26, landmarkB: 28, landmarkC: 32 },

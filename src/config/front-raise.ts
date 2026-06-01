@@ -1,7 +1,11 @@
 import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
+
 export const FRONT_RAISE_CONFIG: ExerciseConfig = {
   name: 'Front Raise',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.2,
+  cameraAngle: 'side',
   angles: [
     {
       name: 'leftShoulderFlexion',

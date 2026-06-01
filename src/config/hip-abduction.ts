@@ -1,6 +1,9 @@
 import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const HIP_ABDUCTION_CONFIG: ExerciseConfig = {
   name: 'Hip Abduction Standing',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'front',
   type: 'rep',
   angles: [
     { name: 'legSpread', landmarkA: 25, landmarkB: 23, landmarkC: 24 },

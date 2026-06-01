@@ -18,7 +18,7 @@ import { NormalCameraView } from './normal';
 // ─── Skia Camera (commented out — uncomment to enable skeleton overlay) ───
 // import { SkiaCameraView } from './skia';
 
-type AppPhase = 'setup' | 'countdown' | 'active' | 'results';
+type AppPhase = 'setup' | 'positioning' | 'countdown' | 'active' | 'results';
 
 export default function App() {
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -39,8 +39,46 @@ export default function App() {
     null
   );
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isInPosition, setIsInPosition] = useState(false);
 
-  // ─── Permissions ────────────────────────────────────────────
+  // ─── Posture Readiness Polling ──────────────────────────────
+  useEffect(() => {
+    if (appPhase !== 'positioning') return;
+
+    const interval = setInterval(() => {
+      try {
+        const ready = nitroPoseExercises.isReady();
+        setIsInPosition(ready);
+      } catch {
+        setIsInPosition(false);
+      }
+    }, 300);
+
+    return () => clearInterval(interval);
+  }, [appPhase]);
+
+  useEffect(() => {
+    if (appPhase !== 'positioning' || !isInPosition) return;
+
+    // Stay in position for 1s before starting countdown — avoids false triggers
+    const timer = setTimeout(() => {
+      setAppPhase('countdown');
+      setCountdownValue(3);
+
+      let count = 3;
+      const tick = setInterval(() => {
+        count -= 1;
+        setCountdownValue(count);
+        if (count <= 0) {
+          clearInterval(tick);
+          setAppPhase('active');
+        }
+      }, 1000);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [appPhase, isInPosition]);
+
   useEffect(() => {
     if (!hasPermission) requestPermission();
   }, [hasPermission, requestPermission]);
@@ -94,6 +132,14 @@ export default function App() {
       setFormMessage('');
     };
 
+    nitroPoseExercises.onPostureLost = () => {
+      setFormMessage('Get back into position');
+    };
+
+    nitroPoseExercises.onPostureRegained = () => {
+      setFormMessage('');
+    };
+
     nitroPoseExercises.onSessionComplete = (result: SessionResult) => {
       setSessionResult(result);
       setAppPhase('results');
@@ -113,20 +159,10 @@ export default function App() {
     setCurrentPhase('unknown');
     setFormMessage('');
     setSessionResult(null);
-    setCountdownValue(3);
-    setAppPhase('countdown');
+    setIsInPosition(false);
+    setAppPhase('positioning');
 
-    let count = 3;
-    const timer = setInterval(() => {
-      count -= 1;
-      setCountdownValue(count);
-      if (count <= 0) {
-        clearInterval(timer);
-        setAppPhase('active');
-      }
-    }, 1000);
-
-    nitroPoseExercises.startSession(10, 3);
+    nitroPoseExercises.startSession(10, 0); // countdown handled in JS now
   }, [isInitialized]);
 
   // ─── Stop Session ───────────────────────────────────────────
@@ -212,6 +248,29 @@ export default function App() {
           <View style={styles.countdownContainer}>
             <Text style={styles.countdownText}>{countdownValue}</Text>
             <Text style={styles.subtitleText}>Get in position!</Text>
+          </View>
+        )}
+
+        {/* Positioning Phase */}
+        {appPhase === 'positioning' && (
+          <View style={styles.positioningContainer}>
+            <Text style={styles.positioningTitle}>
+              {isInPosition ? 'Hold still...' : 'Get into push-up position'}
+            </Text>
+            <Text style={styles.subtitleText}>
+              {isInPosition
+                ? 'Starting soon'
+                : 'Body straight, hands shoulder-width apart'}
+            </Text>
+            <View
+              style={[
+                styles.readinessIndicator,
+                isInPosition && styles.readinessIndicatorReady,
+              ]}
+            />
+            <TouchableOpacity style={styles.stopButton} onPress={resetSession}>
+              <Text style={styles.stopButtonText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -512,5 +571,29 @@ const styles = StyleSheet.create({
     fontFamily: 'System',
     color: '#ccc',
     marginBottom: 4,
+  },
+
+  positioningContainer: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 32,
+    borderRadius: 20,
+  },
+  positioningTitle: {
+    fontSize: 24,
+    fontFamily: 'System',
+    color: '#fff',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  readinessIndicator: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FF9800',
+    marginVertical: 24,
+  },
+  readinessIndicatorReady: {
+    backgroundColor: '#4CAF50',
   },
 });

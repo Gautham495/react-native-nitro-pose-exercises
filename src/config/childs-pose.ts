@@ -2,6 +2,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const CHILDS_POSE_CONFIG: ExerciseConfig = {
   name: "Child's Pose (Balasana)",
   type: 'hold',
+  postureFamily: 'seated',
+  visibilityThreshold: 0.3,
+  cameraAngle: 'side',
   angles: [
     { name: 'hipFold', landmarkA: 11, landmarkB: 23, landmarkC: 25 },
     { name: 'kneeAngle', landmarkA: 23, landmarkB: 25, landmarkC: 27 },

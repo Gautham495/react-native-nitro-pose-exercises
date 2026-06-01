@@ -65,6 +65,10 @@ namespace margelo::nitro::nitroposeexercises {
     void setOnPoseRegained(const std::optional<std::function<void()>>& onPoseRegained) override;
     std::optional<std::function<void(const SessionResult& /* result */)>> getOnSessionComplete() override;
     void setOnSessionComplete(const std::optional<std::function<void(const SessionResult& /* result */)>>& onSessionComplete) override;
+    std::optional<std::function<void()>> getOnPostureLost() override;
+    void setOnPostureLost(const std::optional<std::function<void()>>& onPostureLost) override;
+    std::optional<std::function<void()>> getOnPostureRegained() override;
+    void setOnPostureRegained(const std::optional<std::function<void()>>& onPostureRegained) override;
     ExercisePhase getCurrentPhase() override;
     double getRepCount() override;
     std::vector<Landmark> getLandmarks() override;
@@ -79,6 +83,7 @@ namespace margelo::nitro::nitroposeexercises {
     void pauseSession() override;
     void resumeSession() override;
     void stopSession() override;
+    bool isReady() override;
 
   private:
     jni::global_ref<JHybridNitroPoseExercisesSpec::JavaPart> _javaPart;

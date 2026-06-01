@@ -12,6 +12,8 @@
 namespace margelo::nitro::nitroposeexercises { struct AngleDefinition; }
 // Forward declaration of `AngleSnapshot` to properly resolve imports.
 namespace margelo::nitro::nitroposeexercises { struct AngleSnapshot; }
+// Forward declaration of `CameraAngleType` to properly resolve imports.
+namespace margelo::nitro::nitroposeexercises { enum class CameraAngleType; }
 // Forward declaration of `ExerciseConfig` to properly resolve imports.
 namespace margelo::nitro::nitroposeexercises { struct ExerciseConfig; }
 // Forward declaration of `ExercisePhase` to properly resolve imports.
@@ -34,6 +36,8 @@ namespace margelo::nitro::nitroposeexercises { class HybridNitroPoseExercisesSpe
 namespace margelo::nitro::nitroposeexercises { struct Landmark; }
 // Forward declaration of `PhaseThreshold` to properly resolve imports.
 namespace margelo::nitro::nitroposeexercises { struct PhaseThreshold; }
+// Forward declaration of `PostureFamily` to properly resolve imports.
+namespace margelo::nitro::nitroposeexercises { enum class PostureFamily; }
 // Forward declaration of `RepData` to properly resolve imports.
 namespace margelo::nitro::nitroposeexercises { struct RepData; }
 // Forward declaration of `SessionResult` to properly resolve imports.
@@ -44,6 +48,7 @@ namespace margelo::nitro::nitroposeexercises { enum class SessionStatus; }
 // Include C++ defined types
 #include "AngleDefinition.hpp"
 #include "AngleSnapshot.hpp"
+#include "CameraAngleType.hpp"
 #include "ExerciseConfig.hpp"
 #include "ExercisePhase.hpp"
 #include "ExerciseType.hpp"
@@ -54,6 +59,7 @@ namespace margelo::nitro::nitroposeexercises { enum class SessionStatus; }
 #include "HybridNitroPoseExercisesSpec.hpp"
 #include "Landmark.hpp"
 #include "PhaseThreshold.hpp"
+#include "PostureFamily.hpp"
 #include "RepData.hpp"
 #include "SessionResult.hpp"
 #include "SessionStatus.hpp"

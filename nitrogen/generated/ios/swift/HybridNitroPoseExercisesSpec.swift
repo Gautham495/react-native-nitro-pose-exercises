@@ -19,6 +19,8 @@ public protocol HybridNitroPoseExercisesSpec_protocol: HybridObject {
   var onPoseLost: (() -> Void)? { get set }
   var onPoseRegained: (() -> Void)? { get set }
   var onSessionComplete: ((_ result: SessionResult) -> Void)? { get set }
+  var onPostureLost: (() -> Void)? { get set }
+  var onPostureRegained: (() -> Void)? { get set }
   var currentPhase: ExercisePhase { get }
   var repCount: Double { get }
   var landmarks: [Landmark] { get }
@@ -32,6 +34,7 @@ public protocol HybridNitroPoseExercisesSpec_protocol: HybridObject {
   func pauseSession() throws -> Void
   func resumeSession() throws -> Void
   func stopSession() throws -> Void
+  func isReady() throws -> Bool
 }
 
 public extension HybridNitroPoseExercisesSpec_protocol {

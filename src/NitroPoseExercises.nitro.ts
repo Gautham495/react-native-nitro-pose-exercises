@@ -12,6 +12,17 @@ type FormSeverity = 'info' | 'warning' | 'error';
 
 type SessionStatus = 'idle' | 'countdown' | 'active' | 'paused' | 'completed';
 
+type CameraAngleType = 'side' | 'front';
+
+type PostureFamily =
+  | 'horizontalProne'
+  | 'standingUpright'
+  | 'seated'
+  | 'inverted'
+  | 'sidePlank'
+  | 'supine'
+  | 'none';
+
 // ─── Landmark ────────────────────────────────────────────────
 
 interface Landmark {
@@ -54,6 +65,9 @@ interface ExerciseConfig {
   repSequence: ExercisePhase[]; // e.g. ['up', 'down', 'up'] for a push-up rep
   formRules: FormRule[];
   holdDurationMs: number; // for hold-based exercises
+  postureFamily: PostureFamily; // ← new
+  visibilityThreshold: number; // ← new, 0.0–1.0; suggested 0.3
+  cameraAngle: CameraAngleType; // 'side' | 'front';
 }
 
 // ─── Callback Payloads ───────────────────────────────────────
@@ -118,6 +132,8 @@ interface NitroPoseExercises extends HybridObject<{
   onPoseLost: (() => void) | undefined;
   onPoseRegained: (() => void) | undefined;
   onSessionComplete: ((result: SessionResult) => void) | undefined;
+  onPostureLost: (() => void) | undefined;
+  onPostureRegained: (() => void) | undefined;
 
   // State (readable from JS for UI)
   readonly currentPhase: ExercisePhase;
@@ -129,6 +145,8 @@ interface NitroPoseExercises extends HybridObject<{
   pauseSession(): void;
   resumeSession(): void;
   stopSession(): void;
+
+  isReady(): boolean;
 }
 
 const nitroPoseExercises =
@@ -152,4 +170,5 @@ export type {
   FormFeedback,
   HoldProgress,
   SessionResult,
+  PostureFamily,
 };

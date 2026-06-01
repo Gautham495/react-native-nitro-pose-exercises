@@ -1,7 +1,11 @@
 import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
+
 export const V_UP_CONFIG: ExerciseConfig = {
   name: 'V-Up',
   type: 'rep',
+  postureFamily: 'supine',
+  visibilityThreshold: 0.25,
+  cameraAngle: 'side',
   angles: [
     { name: 'hipFold', landmarkA: 15, landmarkB: 23, landmarkC: 27 },
     { name: 'leftKnee', landmarkA: 23, landmarkB: 25, landmarkC: 27 },

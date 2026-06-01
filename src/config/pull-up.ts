@@ -3,6 +3,9 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const PULL_UP_CONFIG: ExerciseConfig = {
   name: 'Pull-Up',
   type: 'rep',
+  postureFamily: 'standingUpright',
+  visibilityThreshold: 0.2,
+  cameraAngle: 'front',
   angles: [
     { name: 'leftElbow', landmarkA: 11, landmarkB: 13, landmarkC: 15 },
     { name: 'rightElbow', landmarkA: 12, landmarkB: 14, landmarkC: 16 },

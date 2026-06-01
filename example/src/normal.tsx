@@ -7,10 +7,6 @@ import {
 } from 'react-native-vision-camera';
 import { nitroPoseExercises } from 'react-native-nitro-pose-exercises';
 
-// ─── Normal Camera Component ────────────────────────────────
-// Standard VisionCamera with async frame processing for pose detection.
-// No skeleton overlay — just processes frames and sends to the pose engine.
-
 interface NormalCameraViewProps {
   device: CameraDevice;
   isActive: boolean;
@@ -19,7 +15,6 @@ interface NormalCameraViewProps {
 export function NormalCameraView({ device, isActive }: NormalCameraViewProps) {
   const asyncRunner = useAsyncRunner();
 
-  // ─── Frame Processor ────────────────────────────────────────
   const frameOutput = useFrameOutput({
     pixelFormat: 'rgb',
     onFrame(frame) {
