@@ -616,53 +616,62 @@ if (!isPostureValid(config.postureFamily, config.visibilityThreshold)) {
   // Posture Gates
   // ═══════════════════════════════════════════════════════════
 
- private fun isPostureValid(family: PostureFamily, threshold: Double): Boolean {
-    if (_landmarks.size < 33) return false
+private fun isPostureValid(family: PostureFamily, threshold: Double): Boolean {
+  if (_landmarks.size < 33) return false
 
-    val ls = _landmarks[11]; val rs = _landmarks[12]
-    val lh = _landmarks[23]; val rh = _landmarks[24]
-    val lk = _landmarks[25]; val rk = _landmarks[26]
-    val la = _landmarks[27]; val ra = _landmarks[28]
+  val ls = _landmarks[11]; val rs = _landmarks[12]
+  val lh = _landmarks[23]; val rh = _landmarks[24]
+  val lk = _landmarks[25]; val rk = _landmarks[26]
+  val la = _landmarks[27]; val ra = _landmarks[28]
 
-    val keyVisible = ls.visibility > threshold && rs.visibility > threshold &&
+  // Only require torso visible — knees and ankles are optional
+  val torsoVisible = ls.visibility > threshold && rs.visibility > threshold &&
                      lh.visibility > threshold && rh.visibility > threshold
-    if (!keyVisible) return false
+  if (!torsoVisible) return false
 
-    val shoulderY = (ls.y + rs.y) / 2
-    val hipY = (lh.y + rh.y) / 2
-    val shoulderX = (ls.x + rs.x) / 2
-    val hipX = (lh.x + rh.x) / 2
+  val shoulderY = (ls.y + rs.y) / 2
+  val hipY = (lh.y + rh.y) / 2
+  val shoulderX = (ls.x + rs.x) / 2
+  val hipX = (lh.x + rh.x) / 2
 
-    val kneesVisible = lk.visibility > threshold && rk.visibility > threshold
-    val anklesVisible = la.visibility > threshold && ra.visibility > threshold
-    val kneeY = if (kneesVisible) (lk.y + rk.y) / 2 else hipY
-    val ankleY = if (anklesVisible) (la.y + ra.y) / 2 else kneeY
+  val kneesVisible = lk.visibility > threshold && rk.visibility > threshold
+  val anklesVisible = la.visibility > threshold && ra.visibility > threshold
+  val kneeY = if (kneesVisible) (lk.y + rk.y) / 2 else hipY
+  val ankleY = if (anklesVisible) (la.y + ra.y) / 2 else kneeY
 
-return when (family) {
-  PostureFamily.HORIZONTALPRONE, PostureFamily.SUPINE -> {
-    val ys = listOf(shoulderY, hipY, ankleY)
-    (ys.max() - ys.min()) < 0.25
-  }
-  PostureFamily.STANDINGUPRIGHT -> {
-    if (!kneesVisible) false
-    else shoulderY < hipY - 0.08 &&
-         hipY < kneeY + 0.05 &&
-         (if (anklesVisible) kneeY < ankleY else true)
-  }
-  PostureFamily.SEATED -> {
-    if (!kneesVisible) false
-    else shoulderY < hipY - 0.05 && kotlin.math.abs(hipY - kneeY) < 0.20
-  }
-  PostureFamily.SIDEPLANK -> {
-    val ySpread = kotlin.math.abs(shoulderY - hipY)
-    val shoulderHipDx = kotlin.math.abs(shoulderX - hipX)
-    ySpread < 0.20 && shoulderHipDx < 0.15
-  }
-  PostureFamily.INVERTED -> {
-    if (!anklesVisible) false
-    else hipY < shoulderY && hipY < ankleY
-  }
-  PostureFamily.NONE -> true
-}
+  return when (family) {
+    PostureFamily.HORIZONTALPRONE, PostureFamily.SUPINE -> {
+      val ys = if (anklesVisible)
+        listOf(shoulderY, hipY, ankleY)
+      else
+        listOf(shoulderY, hipY)
+      (ys.max() - ys.min()) < 0.25
+    }
+    PostureFamily.STANDINGUPRIGHT -> {
+      if (kneesVisible) {
+        shoulderY < hipY - 0.08 &&
+        hipY < kneeY + 0.05 &&
+        (if (anklesVisible) kneeY < ankleY else true)
+      } else {
+        shoulderY < hipY - 0.08
+      }
+    }
+    PostureFamily.SEATED -> {
+      if (kneesVisible) {
+        shoulderY < hipY - 0.05 && kotlin.math.abs(hipY - kneeY) < 0.20
+      } else {
+        shoulderY < hipY - 0.05
+      }
+    }
+    PostureFamily.SIDEPLANK -> {
+      val ySpread = kotlin.math.abs(shoulderY - hipY)
+      val shoulderHipDx = kotlin.math.abs(shoulderX - hipX)
+      ySpread < 0.20 && shoulderHipDx < 0.15
+    }
+    PostureFamily.INVERTED -> {
+      if (!anklesVisible) false
+      else hipY < shoulderY && hipY < ankleY
+    }
+    PostureFamily.NONE -> true
   }
 }

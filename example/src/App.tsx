@@ -14,6 +14,7 @@ import {
   type ExercisePhase,
   BICEP_CURL_CONFIG,
 } from 'react-native-nitro-pose-exercises';
+// import { NormalCameraView } from './normal';
 import { NormalCameraView } from './normal';
 import { styles } from './camera-styles';
 import { getFramingStatus } from './framing';
@@ -220,6 +221,7 @@ export default function App() {
   return (
     <View style={styles.container}>
       {/* Camera */}
+      {/* <NormalCameraView device={device} isActive={appPhase !== 'results'} /> */}
       <NormalCameraView device={device} isActive={appPhase !== 'results'} />
 
       {/* Overlay UI */}

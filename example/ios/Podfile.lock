@@ -50,7 +50,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - NitroPoseExercises (1.1.10):
+  - NitroPoseExercises (1.1.11):
     - hermes-engine
     - NitroModules
     - RCTRequired
@@ -2339,7 +2339,7 @@ SPEC CHECKSUMS:
   hermes-engine: 63753ee03a2e79303246419be9e0a5dba6c11ab7
   NitroImage: 33c4698f86b081bd3d0245223f34ea561b0934ea
   NitroModules: 16bc17a076b12304d608f7c915b9d321f56dfc19
-  NitroPoseExercises: 8eede027fa04e6bd83dae546f0e14257e7383b01
+  NitroPoseExercises: 9cfbb1a1ec06c90e88f46643cd96004be37f46d4
   RCTDeprecation: a4c521821fab57cbb125b36effe84d897d0dfa12
   RCTRequired: 9f3a7e5645d4bc3f551593de7550bb66ab6e42bc
   RCTSwiftUI: 239ed2eb9e73de5a6f518810630f0c95e01c8702

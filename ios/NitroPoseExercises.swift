@@ -345,7 +345,7 @@ private func processExerciseLogic() {
 // MARK: - Posture Gates
 // ═══════════════════════════════════════════════════════════
 
-private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool  {
+private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool {
   guard _landmarks.count >= 33 else { return false }
 
   let ls = _landmarks[11], rs = _landmarks[12]
@@ -353,38 +353,55 @@ private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool  {
   let lk = _landmarks[25], rk = _landmarks[26]
   let la = _landmarks[27], ra = _landmarks[28]
 
-  let key = [ls, rs, lh, rh]
-  guard key.allSatisfy({ $0.visibility > 0.3 }) else { return false }
+  // Only require torso visible — knees and ankles are optional
+  let torsoVisible = ls.visibility > threshold && rs.visibility > threshold
+                  && lh.visibility > threshold && rh.visibility > threshold
+  guard torsoVisible else { return false }
 
   let shoulderY = (ls.y + rs.y) / 2
   let hipY = (lh.y + rh.y) / 2
   let shoulderX = (ls.x + rs.x) / 2
   let hipX = (lh.x + rh.x) / 2
 
-  let kneesVisible = lk.visibility > 0.3 && rk.visibility > 0.3
-  let anklesVisible = la.visibility > 0.3 && ra.visibility > 0.3
+  let kneesVisible = lk.visibility > threshold && rk.visibility > threshold
+  let anklesVisible = la.visibility > threshold && ra.visibility > threshold
   let kneeY = kneesVisible ? (lk.y + rk.y) / 2 : hipY
   let ankleY = anklesVisible ? (la.y + ra.y) / 2 : kneeY
 
   switch family {
   case .horizontalprone, .supine:
-    let ys = [shoulderY, hipY, ankleY]
+    // Horizontal body — torso, plus ankles if visible
+    let ys: [Double] = anklesVisible
+      ? [shoulderY, hipY, ankleY]
+      : [shoulderY, hipY]
     return ((ys.max() ?? 0) - (ys.min() ?? 0)) < 0.25
 
   case .standingupright:
-    guard kneesVisible else { return false }
-    return shoulderY < hipY - 0.08 && hipY < kneeY + 0.05 && (anklesVisible ? kneeY < ankleY : true)
+    // Torso vertical (shoulders above hips). If knees visible, check chain.
+    if kneesVisible {
+      return shoulderY < hipY - 0.08
+          && hipY < kneeY + 0.05
+          && (anklesVisible ? kneeY < ankleY : true)
+    } else {
+      return shoulderY < hipY - 0.08
+    }
 
   case .seated:
-    guard kneesVisible else { return false }
-    return shoulderY < hipY - 0.05 && Swift.abs(hipY - kneeY) < 0.20
+    // Forward-leaning torso. If knees visible, also check hip-knee distance.
+    if kneesVisible {
+      return shoulderY < hipY - 0.05 && Swift.abs(hipY - kneeY) < 0.20
+    } else {
+      return shoulderY < hipY - 0.05
+    }
 
   case .sideplank:
+    // Body horizontal, shoulders and hips stacked in x
     let ySpread = Swift.abs(shoulderY - hipY)
     let shoulderHipDx = Swift.abs(shoulderX - hipX)
     return ySpread < 0.20 && shoulderHipDx < 0.15
 
   case .inverted:
+    // Genuinely needs ankles — hips highest of all three
     guard anklesVisible else { return false }
     return hipY < shoulderY && hipY < ankleY
 
