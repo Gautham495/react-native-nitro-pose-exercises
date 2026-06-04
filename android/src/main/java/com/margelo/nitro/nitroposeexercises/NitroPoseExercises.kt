@@ -1,6 +1,11 @@
 package com.margelo.nitro.nitroposeexercises
 
-import android.graphics.Matrix
+import com.margelo.nitro.camera.HybridFrameSpec
+import com.margelo.nitro.camera.public.NativeFrame
+import com.google.android.gms.tasks.Tasks
+import java.util.concurrent.TimeUnit
+
+// import android.graphics.Matrix
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
 import com.google.mlkit.vision.pose.PoseDetection
@@ -14,15 +19,13 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-import android.media.Image
-import android.graphics.Bitmap
+// import android.media.Image
+// import android.graphics.Bitmap
 import com.google.mlkit.vision.common.InputImage
-import com.margelo.nitro.core.ArrayBuffer
-import java.nio.ByteBuffer
+// import com.margelo.nitro.core.ArrayBuffer
+// import java.nio.ByteBuffer
 
-import java.nio.ByteOrder
-
-import com.margelo.nitro.camera.HybridFrameSpec
+// import java.nio.ByteOrder
 
 @Keep
 @DoNotStrip
@@ -211,92 +214,86 @@ override fun isReady(): Boolean {
   // Frame Processing (ML Kit — async with cached results)
   // ═══════════════════════════════════════════════════════════
 
+// Reusable scratch — allocated once, never GC'd per frame
+@Volatile private var lastProcessTime: Long = 0L
+private val minIntervalMs: Long = 66L  // ~15fps cap; bump down to 33 for ~30fps
 
+// Time-based throttle — more reliable than frame-count under variable FPS
+@Volatile private var lastProcessTime: Long = 0L
+private val minIntervalMs: Long = 66L  // ~15fps; lower to 33 for ~30fps once release build is fast enough
 
-override fun processFrameAndroid(buffer: ArrayBuffer, width: Double, height: Double, rotation: Double) {
+override fun processFrameAndroid(frame: HybridFrameSpec) {
   if (_status != SessionStatus.ACTIVE && _status != SessionStatus.COUNTDOWN) return
   if (!isInitialized || poseDetector == null) return
 
-  frameCount++
-  if (frameCount % processEveryNFrames != 0) return
+  val now = System.currentTimeMillis()
+  if (now - lastProcessTime < minIntervalMs) return
+  lastProcessTime = now
 
-  val w = width.toInt()
-  val h = height.toInt()
-  val rot = rotation.toInt()
+  val nativeFrame = frame as? NativeFrame ?: return
+  val imageProxy = nativeFrame.image ?: return
+  val mediaImage = imageProxy.image ?: return
 
   try {
-    val rgb = buffer.getBuffer(false)
-    rgb.rewind()
+    val rotation = imageProxy.imageInfo.rotationDegrees
+    val inputImage = InputImage.fromMediaImage(mediaImage, rotation)
 
-    // RGB (3 bytes) -> ARGB_8888 (4 bytes, A=0xFF). Bitmap.Config.ARGB_8888 stores as RGBA in memory.
-    val pixelCount = w * h
-    val rgba = ByteBuffer.allocateDirect(pixelCount * 4).order(ByteOrder.nativeOrder())
-    for (i in 0 until pixelCount) {
-      val r = rgb.get()
-      val g = rgb.get()
-      val b = rgb.get()
-      rgba.put(r)
-      rgba.put(g)
-      rgba.put(b)
-      rgba.put(0xFF.toByte())
+    val rotated = rotation == 90 || rotation == 270
+    val imageWidth = (if (rotated) mediaImage.height else mediaImage.width).toDouble()
+    val imageHeight = (if (rotated) mediaImage.width else mediaImage.height).toDouble()
+
+    // SYNC inference — the frame's underlying ImageProxy is only valid until
+    // VisionCamera disposes the frame after this method returns. Tasks.await
+    // blocks the worklet thread which is exactly what we want here.
+    val pose = try {
+      Tasks.await(poseDetector!!.process(inputImage), 200, TimeUnit.MILLISECONDS)
+    } catch (e: Exception) {
+      // Timeout or failure — skip this frame quietly
+      null
     }
-    rgba.rewind()
 
-    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    bitmap.copyPixelsFromBuffer(rgba)
+    if (pose == null) return
 
-    val inputImage = InputImage.fromBitmap(bitmap, rot)
+    val poseLandmarks = pose.allPoseLandmarks
 
-    val rotated = rot == 90 || rot == 270
-    val imageWidth = (if (rotated) h else w).toDouble()
-    val imageHeight = (if (rotated) w else h).toDouble()
-
-    poseDetector!!.process(inputImage)
-      .addOnSuccessListener { pose ->
-        val poseLandmarks = pose.allPoseLandmarks
-
-        if (poseLandmarks.isNotEmpty()) {
-          if (poseWasLost) {
-            poseWasLost = false
-            onPoseRegained?.invoke()
-          }
-
-          val landmarkArray = Array(34) { Landmark(x = 0.0, y = 0.0, z = 0.0, visibility = 0.0) }
-
-          for (poseLandmark in poseLandmarks) {
-            val mediaPipeIndex = mlKitToMediaPipeMap[poseLandmark.landmarkType] ?: continue
-            if (mediaPipeIndex >= 34) continue
-
-            landmarkArray[mediaPipeIndex] = Landmark(
-              x = (poseLandmark.position3D.x / imageWidth).coerceIn(0.0, 1.0),
-              y = (poseLandmark.position3D.y / imageHeight).coerceIn(0.0, 1.0),
-              z = poseLandmark.position3D.z.toDouble(),
-              visibility = poseLandmark.inFrameLikelihood.toDouble()
-            )
-          }
-
-          synchronized(landmarkLock) {
-            cachedLandmarks = landmarkArray
-            _landmarks = landmarkArray
-          }
-
-          processExerciseLogic()  // your actual method name
-        } else {
-          if (!poseWasLost) {
-            poseWasLost = true
-            onPoseLost?.invoke()
-          }
-        }
+    if (poseLandmarks.isNotEmpty()) {
+      if (poseWasLost) {
+        poseWasLost = false
+        onPoseRegained?.invoke()
       }
-      .addOnFailureListener { e ->
-        println("[PoseExercise] ML Kit failure: ${e.message}")
+
+      val landmarkArray = Array(34) { Landmark(x = 0.0, y = 0.0, z = 0.0, visibility = 0.0) }
+
+      for (poseLandmark in poseLandmarks) {
+        val mediaPipeIndex = mlKitToMediaPipeMap[poseLandmark.landmarkType] ?: continue
+        if (mediaPipeIndex >= 34) continue
+
+        landmarkArray[mediaPipeIndex] = Landmark(
+          x = (poseLandmark.position3D.x / imageWidth).coerceIn(0.0, 1.0),
+          y = (poseLandmark.position3D.y / imageHeight).coerceIn(0.0, 1.0),
+          z = poseLandmark.position3D.z.toDouble(),
+          visibility = poseLandmark.inFrameLikelihood.toDouble()
+        )
       }
-      .addOnCompleteListener {
-        bitmap.recycle()
+
+      synchronized(landmarkLock) {
+        cachedLandmarks = landmarkArray
+        _landmarks = landmarkArray
       }
+
+      processExerciseLogic()
+    } else {
+      if (!poseWasLost) {
+        poseWasLost = true
+        onPoseLost?.invoke()
+      }
+    }
   } catch (e: Exception) {
     println("[PoseExercise] processFrameAndroid error: ${e.message}")
   }
+  // NOTE: we do NOT close the ImageProxy ourselves.
+  // VisionCamera owns the frame lifecycle and will release it when
+  // frame.dispose() runs in the JS worklet after we return.
 }
 
 override fun processFrameIOS(frame: HybridFrameSpec) {
@@ -639,54 +636,87 @@ private fun isPostureValid(family: PostureFamily, threshold: Double): Boolean {
   val lk = _landmarks[25]; val rk = _landmarks[26]
   val la = _landmarks[27]; val ra = _landmarks[28]
 
-  // Only require torso visible — knees and ankles are optional
-  val torsoVisible = ls.visibility > threshold && rs.visibility > threshold &&
-                     lh.visibility > threshold && rh.visibility > threshold
-  if (!torsoVisible) return false
+  // Shoulders mandatory; everything below is optional for close-range framing
+  val shouldersVisible = ls.visibility > threshold && rs.visibility > threshold
+  if (!shouldersVisible) return false
 
-  val shoulderY = (ls.y + rs.y) / 2
-  val hipY = (lh.y + rh.y) / 2
-  val shoulderX = (ls.x + rs.x) / 2
-  val hipX = (lh.x + rh.x) / 2
-
+  val hipsVisible = lh.visibility > threshold && rh.visibility > threshold
   val kneesVisible = lk.visibility > threshold && rk.visibility > threshold
   val anklesVisible = la.visibility > threshold && ra.visibility > threshold
+
+  val shoulderY = (ls.y + rs.y) / 2
+  val shoulderX = (ls.x + rs.x) / 2
+  val hipY = if (hipsVisible) (lh.y + rh.y) / 2 else shoulderY
+  val hipX = if (hipsVisible) (lh.x + rh.x) / 2 else shoulderX
   val kneeY = if (kneesVisible) (lk.y + rk.y) / 2 else hipY
   val ankleY = if (anklesVisible) (la.y + ra.y) / 2 else kneeY
 
+  // Mirror-invariant — works for front and back camera identically
+  val shoulderWidth = kotlin.math.abs(ls.x - rs.x)
+
   return when (family) {
     PostureFamily.HORIZONTALPRONE, PostureFamily.SUPINE -> {
+      if (!hipsVisible) return false
+
+      // Case A: side view — shoulders/hips/(ankles) in a horizontal band
       val ys = if (anklesVisible)
         listOf(shoulderY, hipY, ankleY)
       else
         listOf(shoulderY, hipY)
-      (ys.max() - ys.min()) < 0.25
+      if ((ys.max() - ys.min()) < 0.25) return true
+
+      // Case B: front-facing prone (pushup head-on) — large y-spread,
+      // fall back to upper-body geometry
+      val le = _landmarks[13]; val re = _landmarks[14]
+      val lw = _landmarks[15]; val rw = _landmarks[16]
+      val upperBodyVisible = le.visibility > threshold && re.visibility > threshold &&
+                             lw.visibility > threshold && rw.visibility > threshold
+      if (!upperBodyVisible) return false
+
+      val wristY = (lw.y + rw.y) / 2
+      wristY > shoulderY + 0.03 && shoulderWidth > 0.10
     }
+
     PostureFamily.STANDINGUPRIGHT -> {
-      if (kneesVisible) {
-        shoulderY < hipY - 0.08 &&
-        hipY < kneeY + 0.05 &&
-        (if (anklesVisible) kneeY < ankleY else true)
+      if (hipsVisible) {
+        if (kneesVisible) {
+          shoulderY < hipY - 0.05 &&
+          hipY < kneeY + 0.05 &&
+          (if (anklesVisible) kneeY < ankleY else true)
+        } else {
+          shoulderY < hipY - 0.05
+        }
       } else {
-        shoulderY < hipY - 0.08
+        // Hips cropped (close-range front-facing) — accept based on shoulder span
+        shoulderWidth > 0.08
       }
     }
+
     PostureFamily.SEATED -> {
-      if (kneesVisible) {
-        shoulderY < hipY - 0.05 && kotlin.math.abs(hipY - kneeY) < 0.20
-      } else {
-        shoulderY < hipY - 0.05
+      when {
+        hipsVisible && kneesVisible -> shoulderY < hipY - 0.05 && kotlin.math.abs(hipY - kneeY) < 0.20
+        hipsVisible -> shoulderY < hipY - 0.05
+        else -> shoulderWidth > 0.08
       }
     }
+
     PostureFamily.SIDEPLANK -> {
-      val ySpread = kotlin.math.abs(shoulderY - hipY)
-      val shoulderHipDx = kotlin.math.abs(shoulderX - hipX)
-      ySpread < 0.20 && shoulderHipDx < 0.15
+      if (!hipsVisible) false
+      else {
+        val ySpread = kotlin.math.abs(shoulderY - hipY)
+        val shoulderHipDx = kotlin.math.abs(shoulderX - hipX)
+        ySpread < 0.20 && shoulderHipDx < 0.15
+      }
     }
+
     PostureFamily.INVERTED -> {
-      if (!anklesVisible) false
+      if (!hipsVisible || !anklesVisible) false
       else hipY < shoulderY && hipY < ankleY
     }
+
     PostureFamily.NONE -> true
   }
-}}
+}
+
+
+}

@@ -12,7 +12,6 @@ import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.camera.HybridFrameSpec
-import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.HybridObject
 
 /**
@@ -189,7 +188,7 @@ abstract class HybridNitroPoseExercisesSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun processFrameAndroid(buffer: ArrayBuffer, width: Double, height: Double, rotation: Double): Unit
+  abstract fun processFrameAndroid(frame: com.margelo.nitro.camera.HybridFrameSpec): Unit
   
   @DoNotStrip
   @Keep

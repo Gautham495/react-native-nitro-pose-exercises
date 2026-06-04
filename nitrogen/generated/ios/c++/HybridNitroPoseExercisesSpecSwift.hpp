@@ -46,8 +46,6 @@ namespace margelo::nitro::nitroposeexercises { enum class PostureFamily; }
 namespace margelo::nitro::nitroposeexercises { enum class CameraAngleType; }
 // Forward declaration of `HybridFrameSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridFrameSpec; }
-// Forward declaration of `ArrayBufferHolder` to properly resolve imports.
-namespace NitroModules { class ArrayBufferHolder; }
 
 #include "SessionStatus.hpp"
 #include "RepData.hpp"
@@ -72,8 +70,6 @@ namespace NitroModules { class ArrayBufferHolder; }
 #include "CameraAngleType.hpp"
 #include <memory>
 #include <VisionCamera/HybridFrameSpec.hpp>
-#include <NitroModules/ArrayBuffer.hpp>
-#include <NitroModules/ArrayBufferHolder.hpp>
 
 #include "NitroPoseExercises-Swift-Cxx-Umbrella.hpp"
 
@@ -228,8 +224,8 @@ namespace margelo::nitro::nitroposeexercises {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void processFrameAndroid(const std::shared_ptr<ArrayBuffer>& buffer, double width, double height, double rotation) override {
-      auto __result = _swiftPart.processFrameAndroid(ArrayBufferHolder(buffer), std::forward<decltype(width)>(width), std::forward<decltype(height)>(height), std::forward<decltype(rotation)>(rotation));
+    inline void processFrameAndroid(const std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>& frame) override {
+      auto __result = _swiftPart.processFrameAndroid(frame);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

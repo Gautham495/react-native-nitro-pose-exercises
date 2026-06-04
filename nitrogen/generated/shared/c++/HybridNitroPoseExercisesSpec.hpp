@@ -47,7 +47,6 @@ namespace margelo::nitro::camera { class HybridFrameSpec; }
 #include "ExerciseConfig.hpp"
 #include <memory>
 #include <VisionCamera/HybridFrameSpec.hpp>
-#include <NitroModules/ArrayBuffer.hpp>
 
 namespace margelo::nitro::nitroposeexercises {
 
@@ -105,7 +104,7 @@ namespace margelo::nitro::nitroposeexercises {
       virtual void release() = 0;
       virtual void loadExercise(const ExerciseConfig& config) = 0;
       virtual void processFrameIOS(const std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>& frame) = 0;
-      virtual void processFrameAndroid(const std::shared_ptr<ArrayBuffer>& buffer, double width, double height, double rotation) = 0;
+      virtual void processFrameAndroid(const std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>& frame) = 0;
       virtual void startSession(double targetReps, double countdownSeconds) = 0;
       virtual void pauseSession() = 0;
       virtual void resumeSession() = 0;

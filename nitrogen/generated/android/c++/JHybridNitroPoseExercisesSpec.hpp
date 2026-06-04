@@ -79,7 +79,7 @@ namespace margelo::nitro::nitroposeexercises {
     void release() override;
     void loadExercise(const ExerciseConfig& config) override;
     void processFrameIOS(const std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>& frame) override;
-    void processFrameAndroid(const std::shared_ptr<ArrayBuffer>& buffer, double width, double height, double rotation) override;
+    void processFrameAndroid(const std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>& frame) override;
     void startSession(double targetReps, double countdownSeconds) override;
     void pauseSession() override;
     void resumeSession() override;

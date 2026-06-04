@@ -261,7 +261,8 @@ func processFrameIOS(frame: any HybridFrameSpec) throws {
     }
   }
 
-func processFrameAndroid(buffer: ArrayBuffer, width: Double, height: Double, rotation: Double) {
+// func processFrameAndroid(buffer: ArrayBuffer, width: Double, height: Double, rotation: Double) {
+func processFrameAndroid(frame: any HybridFrameSpec) {
   // no-op on iOS
 }
   // ═══════════════════════════════════════════════════════════
@@ -354,74 +355,85 @@ private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool {
   let lk = _landmarks[25], rk = _landmarks[26]
   let la = _landmarks[27], ra = _landmarks[28]
 
-  // Only require torso visible — knees and ankles are optional
-  let torsoVisible = ls.visibility > threshold && rs.visibility > threshold
-                  && lh.visibility > threshold && rh.visibility > threshold
-  guard torsoVisible else { return false }
+  // Shoulders are mandatory; hips/knees/ankles are optional for close-range framing
+  let shouldersVisible = ls.visibility > threshold && rs.visibility > threshold
+  guard shouldersVisible else { return false }
 
-  let shoulderY = (ls.y + rs.y) / 2
-  let hipY = (lh.y + rh.y) / 2
-  let shoulderX = (ls.x + rs.x) / 2
-  let hipX = (lh.x + rh.x) / 2
-
+  let hipsVisible = lh.visibility > threshold && rh.visibility > threshold
   let kneesVisible = lk.visibility > threshold && rk.visibility > threshold
   let anklesVisible = la.visibility > threshold && ra.visibility > threshold
+
+  let shoulderY = (ls.y + rs.y) / 2
+  let shoulderX = (ls.x + rs.x) / 2
+  let hipY = hipsVisible ? (lh.y + rh.y) / 2 : shoulderY
+  let hipX = hipsVisible ? (lh.x + rh.x) / 2 : shoulderX
   let kneeY = kneesVisible ? (lk.y + rk.y) / 2 : hipY
   let ankleY = anklesVisible ? (la.y + ra.y) / 2 : kneeY
 
+  // Shoulder width is camera-mirror invariant: |x1 - x2| is the same
+  // whether the front camera mirror has been applied or not.
+  let shoulderWidth = (ls.x - rs.x).magnitude
+
   switch family {
-case .horizontalprone, .supine:
-  // Case A: side view — shoulders, hips, ankles in horizontal band
-  let ys: [Double] = anklesVisible
-    ? [shoulderY, hipY, ankleY]
-    : [shoulderY, hipY]
-  let ySpread = (ys.max() ?? 0) - (ys.min() ?? 0)
-  if ySpread < 0.25 {
+  case .horizontalprone, .supine:
+    // Need hips to make any meaningful judgment for prone/supine
+    guard hipsVisible else { return false }
+
+    // Case A: side view — shoulders, hips, ankles in a horizontal band
+    let ys: [Double] = anklesVisible
+      ? [shoulderY, hipY, ankleY]
+      : [shoulderY, hipY]
+    let ySpread = (ys.max() ?? 0) - (ys.min() ?? 0)
+    if ySpread < 0.25 {
+      return true
+    }
+
+    // Case B: front-facing prone (e.g. pushup viewed head-on) — body extends
+    // away along Z, so y-spread is large. Fall back to upper-body geometry.
+    let le = _landmarks[13], re = _landmarks[14]
+    let lw = _landmarks[15], rw = _landmarks[16]
+    let upperBodyVisible = le.visibility > threshold && re.visibility > threshold
+                        && lw.visibility > threshold && rw.visibility > threshold
+    guard upperBodyVisible else { return false }
+
+    let wristY = (lw.y + rw.y) / 2
+    guard wristY > shoulderY + 0.03 else { return false }
+    guard shoulderWidth > 0.10 else { return false }
     return true
-  }
-
-  // Case B: front-facing — body extends away from camera along Z.
-  // Y-spread is large (head close, feet far), so check upper-body geometry.
-  let le = _landmarks[13], re = _landmarks[14]
-  let lw = _landmarks[15], rw = _landmarks[16]
-  let upperBodyVisible = le.visibility > threshold && re.visibility > threshold
-                      && lw.visibility > threshold && rw.visibility > threshold
-  guard upperBodyVisible else { return false }
-
-  let wristY = (lw.y + rw.y) / 2
-  let shoulderWidth = abs(ls.x - rs.x)
-  guard wristY > shoulderY + 0.03 else { return false }
-  guard shoulderWidth > 0.10 else { return false }
-
-  return true
 
   case .standingupright:
-    // Torso vertical (shoulders above hips). If knees visible, check chain.
-    if kneesVisible {
-      return shoulderY < hipY - 0.08
-          && hipY < kneeY + 0.05
-          && (anklesVisible ? kneeY < ankleY : true)
-    } else {
-      return shoulderY < hipY - 0.08
-    }
-
-  case .seated:
-    // Forward-leaning torso. If knees visible, also check hip-knee distance.
-    if kneesVisible {
-      return shoulderY < hipY - 0.05 && Swift.abs(hipY - kneeY) < 0.20
-    } else {
+    // Front-facing standing: user often crops hips/knees at close range.
+    // Use a tiered check based on what's visible.
+    if hipsVisible {
+      if kneesVisible {
+        return shoulderY < hipY - 0.05
+            && hipY < kneeY + 0.05
+            && (anklesVisible ? kneeY < ankleY : true)
+      }
       return shoulderY < hipY - 0.05
     }
+    // Hips off-frame — accept if shoulders form a reasonable horizontal span,
+    // which means the person is upright and facing (or backing) the camera.
+    return shoulderWidth > 0.08
+
+  case .seated:
+    if hipsVisible && kneesVisible {
+      return shoulderY < hipY - 0.05 && (hipY - kneeY).magnitude < 0.20
+    }
+    if hipsVisible {
+      return shoulderY < hipY - 0.05
+    }
+    // Seated with hips out of frame is rare; fall back to upright shoulder span
+    return shoulderWidth > 0.08
 
   case .sideplank:
-    // Body horizontal, shoulders and hips stacked in x
-    let ySpread = Swift.abs(shoulderY - hipY)
-    let shoulderHipDx = Swift.abs(shoulderX - hipX)
+    guard hipsVisible else { return false }
+    let ySpread = (shoulderY - hipY).magnitude
+    let shoulderHipDx = (shoulderX - hipX).magnitude
     return ySpread < 0.20 && shoulderHipDx < 0.15
 
   case .inverted:
-    // Genuinely needs ankles — hips highest of all three
-    guard anklesVisible else { return false }
+    guard hipsVisible, anklesVisible else { return false }
     return hipY < shoulderY && hipY < ankleY
 
   case .none:

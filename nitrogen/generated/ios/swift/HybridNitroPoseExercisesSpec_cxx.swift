@@ -502,9 +502,13 @@ open class HybridNitroPoseExercisesSpec_cxx {
   }
   
   @inline(__always)
-  public final func processFrameAndroid(buffer: ArrayBuffer, width: Double, height: Double, rotation: Double) -> bridge.Result_void_ {
+  public final func processFrameAndroid(frame: bridge.std__shared_ptr_margelo__nitro__camera__HybridFrameSpec_) -> bridge.Result_void_ {
     do {
-      try self.__implementation.processFrameAndroid(buffer: buffer, width: width, height: height, rotation: rotation)
+      try self.__implementation.processFrameAndroid(frame: { () -> any HybridFrameSpec in
+        let __unsafePointer = bridge.get_std__shared_ptr_margelo__nitro__camera__HybridFrameSpec_(frame)
+        let __instance = HybridFrameSpec_cxx.fromUnsafe(__unsafePointer)
+        return __instance.getHybridFrameSpec()
+      }())
       return bridge.create_Result_void_()
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()

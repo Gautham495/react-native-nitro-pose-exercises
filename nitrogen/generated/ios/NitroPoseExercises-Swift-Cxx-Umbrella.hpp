@@ -63,7 +63,6 @@ namespace margelo::nitro::nitroposeexercises { enum class SessionStatus; }
 #include "RepData.hpp"
 #include "SessionResult.hpp"
 #include "SessionStatus.hpp"
-#include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <VisionCamera/HybridFrameSpec.hpp>
