@@ -9,33 +9,18 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const PUSHUP_CONFIG: ExerciseConfig = {
   name: 'Push-Up',
   type: 'rep',
-  postureFamily: 'none',
-  visibilityThreshold: 0.3,
+  postureFamily: 'horizontalProne',
+  visibilityThreshold: 0.1,
   cameraAngle: 'front',
   angles: [
     { name: 'leftElbow', landmarkA: 11, landmarkB: 13, landmarkC: 15 },
     { name: 'rightElbow', landmarkA: 12, landmarkB: 14, landmarkC: 16 },
   ],
   phases: [
-    // Calibrated for 2D-projected angles in front-facing portrait filming.
-    // Real anatomical 180° appears as ~140-150° due to perspective foreshortening.
     { phase: 'up', angleName: 'leftElbow', minAngle: 130, maxAngle: 180 },
-    { phase: 'down', angleName: 'leftElbow', minAngle: 40, maxAngle: 80 },
+    { phase: 'down', angleName: 'leftElbow', minAngle: 0, maxAngle: 120 },
   ],
   repSequence: ['up', 'down', 'up'],
-  formRules: [
-    // Trigger when descending but stalled above true-down threshold
-    {
-      name: 'shallowRep',
-      message: 'Go lower',
-      severity: 'info',
-      angleName: 'leftElbow',
-      minAngle: 80,
-      maxAngle: 130, // "limbo zone" — too low to be up, too high to be down
-      // Note: ideally this only fires when angle has stalled, not on the way down.
-      // If your formRule engine doesn't support velocity/stall detection,
-      // accept that it'll fire briefly during transitions too.
-    },
-  ],
+  formRules: [],
   holdDurationMs: 0,
 };

@@ -7,15 +7,15 @@ import {
 // import { SwitchCamera } from 'lucide-react-native';
 import {
   nitroPoseExercises,
-  // PUSHUP_CONFIG,
+  PUSHUP_CONFIG,
   type RepData,
   type FormFeedback,
   type SessionResult,
   type ExercisePhase,
-  BICEP_CURL_CONFIG,
+  // BICEP_CURL_CONFIG,
 } from 'react-native-nitro-pose-exercises';
-import { NormalCameraView } from './normal';
-// import { NormalCameraView } from './skia';
+// import { NormalCameraView } from './normal';
+import { NormalCameraView } from './skia';
 import { styles } from './camera-styles';
 import { getFramingStatus } from './framing';
 
@@ -51,8 +51,8 @@ export default function App() {
     const interval = setInterval(() => {
       try {
         const lms = nitroPoseExercises.landmarks;
-        // const framing = getFramingStatus(lms, PUSHUP_CONFIG.cameraAngle);
-        const framing = getFramingStatus(lms, BICEP_CURL_CONFIG.cameraAngle);
+        const framing = getFramingStatus(lms, PUSHUP_CONFIG.cameraAngle);
+        // const framing = getFramingStatus(lms, BICEP_CURL_CONFIG.cameraAngle);
 
         if (!framing.ready) {
           setFramingMessage(framing.message);
@@ -106,7 +106,10 @@ export default function App() {
     async function init() {
       try {
         await nitroPoseExercises.initialize('');
-        nitroPoseExercises.loadExercise(BICEP_CURL_CONFIG);
+
+        nitroPoseExercises.loadExercise(PUSHUP_CONFIG);
+        // nitroPoseExercises.loadExercise(BICEP_CURL_CONFIG);
+
         setIsInitialized(true);
       } catch (error) {
         console.error('Failed to initialize pose engine:', error);

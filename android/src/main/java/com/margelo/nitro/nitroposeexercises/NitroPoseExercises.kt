@@ -130,7 +130,7 @@ override var onPostureRegained: (() -> Unit)? = null
 
   // ─── Posture Gate ──────────────────────────────────────────
 private var consecutivePostureFailures: Int = 0
-private val postureFailureThreshold: Int = 10
+private val postureFailureThreshold: Int = 30  // ~3s — tolerant of pushup occlusion
 private var postureWasLost = false
 
   // ─── Hold Tracking ──────────────────────────────────────────
@@ -304,23 +304,31 @@ private fun processExerciseLogic() {
   val config = exerciseConfig ?: return
   if (_landmarks.isEmpty()) return
 
-val failureThreshold = if (config.type == ExerciseType.HOLD)
-  postureFailureThreshold * 3
-else
-  postureFailureThreshold
-
-if (!isPostureValid(config.postureFamily, config.visibilityThreshold)) {
-  consecutivePostureFailures++
-  if (consecutivePostureFailures >= failureThreshold) {
-    if (!postureWasLost) {
-      postureWasLost = true
-      onPostureLost?.invoke()
-    }
-    _currentPhase = ExercisePhase.UNKNOWN
-    phaseHistory.clear()
+  // Hold exercises get 3x more tolerance — stationary poses suffer from
+  // visibility flicker more than active reps.
+  val failureThreshold = if (config.type == ExerciseType.HOLD) {
+    postureFailureThreshold * 3
+  } else {
+    postureFailureThreshold
   }
-  return
-}
+
+  // Posture gate with hysteresis
+  if (!isPostureValid(config.postureFamily, config.visibilityThreshold)) {
+    consecutivePostureFailures += 1
+    if (consecutivePostureFailures >= failureThreshold) {
+      if (!postureWasLost) {
+        postureWasLost = true
+        onPostureLost?.invoke()
+      }
+      // Only nuke phase history after EXTENDED loss (3x threshold).
+      // Brief occlusions during a pushup shouldn't wipe an in-progress rep.
+      if (consecutivePostureFailures >= failureThreshold * 3) {
+        _currentPhase = ExercisePhase.UNKNOWN
+        phaseHistory = mutableListOf()
+      }
+    }
+    return
+  }
 
   consecutivePostureFailures = 0
   if (postureWasLost) {
@@ -328,40 +336,52 @@ if (!isPostureValid(config.postureFamily, config.visibilityThreshold)) {
     onPostureRegained?.invoke()
   }
 
-    val currentAngles = mutableMapOf<String, Double>()
-    val angleSnapshots = mutableListOf<AngleSnapshot>()
+  // Angle calculation
+  val visThreshold = config.visibilityThreshold
+  val currentAngles = mutableMapOf<String, Double>()
+  val angleSnapshots = mutableListOf<AngleSnapshot>()
 
-    for (angleDef in config.angles) {
-      val a = angleDef.landmarkA.toInt()
-      val b = angleDef.landmarkB.toInt()
-      val c = angleDef.landmarkC.toInt()
+  for (angleDef in config.angles) {
+    val a = angleDef.landmarkA.toInt()
+    val b = angleDef.landmarkB.toInt()
+    val c = angleDef.landmarkC.toInt()
 
-      if (a >= _landmarks.size || b >= _landmarks.size || c >= _landmarks.size) continue
+    if (a >= _landmarks.size || b >= _landmarks.size || c >= _landmarks.size) continue
 
-      // Only calculate if all three landmarks have reasonable confidence
-      if (_landmarks[a].visibility < 0.3 || _landmarks[b].visibility < 0.3 || _landmarks[c].visibility < 0.3) continue
+    if (_landmarks[a].visibility <= visThreshold ||
+        _landmarks[b].visibility <= visThreshold ||
+        _landmarks[c].visibility <= visThreshold) continue
 
-      val angle = calculateAngle(_landmarks[a], _landmarks[b], _landmarks[c])
-      currentAngles[angleDef.name] = angle
-      angleSnapshots.add(AngleSnapshot(name = angleDef.name, value = angle))
-    }
+    val angle = calculateAngle(
+      pointA = _landmarks[a],
+      vertex = _landmarks[b],
+      pointC = _landmarks[c]
+    )
 
-    repAngleSnapshots = angleSnapshots.toTypedArray()
-
-    val detectedPhase = determinePhase(currentAngles, config)
-
-    if (detectedPhase != _currentPhase && detectedPhase != ExercisePhase.UNKNOWN) {
-      _currentPhase = detectedPhase
-      onPhaseChange?.invoke(detectedPhase)
-      handlePhaseTransition(detectedPhase, config)
-    }
-
-    checkFormRules(currentAngles, config)
-
-    if (config.type == ExerciseType.HOLD) {
-      handleHoldProgress(currentAngles, config)
-    }
+    currentAngles[angleDef.name] = angle
+    angleSnapshots.add(AngleSnapshot(name = angleDef.name, value = angle))
   }
+
+  repAngleSnapshots = angleSnapshots
+
+  val detectedPhase = determinePhase(currentAngles, config)
+
+  // Debug log — remove once reps count reliably
+  println("[Pose] angles=$currentAngles current=$_currentPhase detected=$detectedPhase history=$phaseHistory reps=$_repCount")
+
+  if (detectedPhase != _currentPhase && detectedPhase != ExercisePhase.UNKNOWN) {
+    val previousPhase = _currentPhase
+    _currentPhase = detectedPhase
+    onPhaseChange?.invoke(detectedPhase)
+    handlePhaseTransition(previousPhase, detectedPhase, config)
+  }
+
+  checkFormRules(currentAngles, config)
+
+  if (config.type == ExerciseType.HOLD) {
+    handleHoldProgress(currentAngles, config)
+  }
+}
 
   // ═══════════════════════════════════════════════════════════
   // Angle Calculation
@@ -635,6 +655,7 @@ private fun isPostureValid(family: PostureFamily, threshold: Double): Boolean {
   val lh = _landmarks[23]; val rh = _landmarks[24]
   val lk = _landmarks[25]; val rk = _landmarks[26]
   val la = _landmarks[27]; val ra = _landmarks[28]
+  val lw = _landmarks[15]; val rw = _landmarks[16]
 
   // Shoulders mandatory; everything below is optional for close-range framing
   val shouldersVisible = ls.visibility > threshold && rs.visibility > threshold
@@ -643,6 +664,8 @@ private fun isPostureValid(family: PostureFamily, threshold: Double): Boolean {
   val hipsVisible = lh.visibility > threshold && rh.visibility > threshold
   val kneesVisible = lk.visibility > threshold && rk.visibility > threshold
   val anklesVisible = la.visibility > threshold && ra.visibility > threshold
+  val wristsVisible = lw.visibility > threshold && rw.visibility > threshold
+  val oneWristVisible = lw.visibility > threshold || rw.visibility > threshold
 
   val shoulderY = (ls.y + rs.y) / 2
   val shoulderX = (ls.x + rs.x) / 2
@@ -656,25 +679,31 @@ private fun isPostureValid(family: PostureFamily, threshold: Double): Boolean {
 
   return when (family) {
     PostureFamily.HORIZONTALPRONE, PostureFamily.SUPINE -> {
-      if (!hipsVisible) return false
+      // Case A: side view — full body in horizontal band
+      if (hipsVisible) {
+        val ys = if (anklesVisible)
+          listOf(shoulderY, hipY, ankleY)
+        else
+          listOf(shoulderY, hipY)
+        if ((ys.max() - ys.min()) < 0.25) return true
+      }
 
-      // Case A: side view — shoulders/hips/(ankles) in a horizontal band
-      val ys = if (anklesVisible)
-        listOf(shoulderY, hipY, ankleY)
+      // Case B: front-facing prone — minimum signature is shoulders + at least
+      // one wrist. Hips often occluded by the body in pushup framings.
+      if (!oneWristVisible) return false
+
+      val wristY = if (wristsVisible)
+        (lw.y + rw.y) / 2
       else
-        listOf(shoulderY, hipY)
-      if ((ys.max() - ys.min()) < 0.25) return true
+        kotlin.math.max(lw.y, rw.y)
 
-      // Case B: front-facing prone (pushup head-on) — large y-spread,
-      // fall back to upper-body geometry
-      val le = _landmarks[13]; val re = _landmarks[14]
-      val lw = _landmarks[15]; val rw = _landmarks[16]
-      val upperBodyVisible = le.visibility > threshold && re.visibility > threshold &&
-                             lw.visibility > threshold && rw.visibility > threshold
-      if (!upperBodyVisible) return false
+      // Geometry: wrists at or below shoulder line, torso reasonably wide.
+      // Tolerance loosened for deep DOWN phase where shoulders drop close
+      // to wrist level.
+      val handsLowerOrLevel = wristY > shoulderY - 0.08
+      val torsoFacing = shoulderWidth > 0.06
 
-      val wristY = (lw.y + rw.y) / 2
-      wristY > shoulderY + 0.03 && shoulderWidth > 0.10
+      handsLowerOrLevel && torsoFacing
     }
 
     PostureFamily.STANDINGUPRIGHT -> {

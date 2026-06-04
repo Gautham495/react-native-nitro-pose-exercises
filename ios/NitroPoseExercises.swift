@@ -72,7 +72,7 @@ class NitroPoseExercises: HybridNitroPoseExercisesSpec {
 
   // ─── Posture Gate ──────────────────────────────────────────
 private var consecutivePostureFailures: Int = 0
-private let postureFailureThreshold: Int = 10  // ~1s at 30fps with throttle=3
+private let postureFailureThreshold: Int = 30  // ~3s at 30fps with throttle=3 — tolerant of pushup occlusion
 private var postureWasLost = false
 
   // ─── Pose Tracking ──────────────────────────────────────────
@@ -287,8 +287,12 @@ private func processExerciseLogic() {
         postureWasLost = true
         onPostureLost?()
       }
-      _currentPhase = .unknown
-      phaseHistory = []
+      // Only nuke phase history after EXTENDED loss (3x threshold).
+      // Brief occlusions during a pushup shouldn't wipe an in-progress rep.
+      if consecutivePostureFailures >= failureThreshold * 3 {
+        _currentPhase = .unknown
+        phaseHistory = []
+      }
     }
     return
   }
@@ -329,6 +333,9 @@ private func processExerciseLogic() {
 
   let detectedPhase = determinePhase(from: currentAngles, config: config)
 
+  // Debug log — remove once reps count reliably
+  print("[Pose] angles=\(currentAngles) current=\(_currentPhase) detected=\(detectedPhase) history=\(phaseHistory) reps=\(_repCount)")
+
   if detectedPhase != _currentPhase && detectedPhase != .unknown {
     let previousPhase = _currentPhase
     _currentPhase = detectedPhase
@@ -354,14 +361,17 @@ private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool {
   let lh = _landmarks[23], rh = _landmarks[24]
   let lk = _landmarks[25], rk = _landmarks[26]
   let la = _landmarks[27], ra = _landmarks[28]
+  let lw = _landmarks[15], rw = _landmarks[16]
 
-  // Shoulders are mandatory; hips/knees/ankles are optional for close-range framing
+  // Shoulders mandatory; everything below is optional for close-range framing
   let shouldersVisible = ls.visibility > threshold && rs.visibility > threshold
   guard shouldersVisible else { return false }
 
   let hipsVisible = lh.visibility > threshold && rh.visibility > threshold
   let kneesVisible = lk.visibility > threshold && rk.visibility > threshold
   let anklesVisible = la.visibility > threshold && ra.visibility > threshold
+  let wristsVisible = lw.visibility > threshold && rw.visibility > threshold
+  let oneWristVisible = lw.visibility > threshold || rw.visibility > threshold
 
   let shoulderY = (ls.y + rs.y) / 2
   let shoulderX = (ls.x + rs.x) / 2
@@ -370,40 +380,40 @@ private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool {
   let kneeY = kneesVisible ? (lk.y + rk.y) / 2 : hipY
   let ankleY = anklesVisible ? (la.y + ra.y) / 2 : kneeY
 
-  // Shoulder width is camera-mirror invariant: |x1 - x2| is the same
-  // whether the front camera mirror has been applied or not.
+  // Mirror-invariant — works for front and back camera identically
   let shoulderWidth = (ls.x - rs.x).magnitude
 
   switch family {
   case .horizontalprone, .supine:
-    // Need hips to make any meaningful judgment for prone/supine
-    guard hipsVisible else { return false }
-
-    // Case A: side view — shoulders, hips, ankles in a horizontal band
-    let ys: [Double] = anklesVisible
-      ? [shoulderY, hipY, ankleY]
-      : [shoulderY, hipY]
-    let ySpread = (ys.max() ?? 0) - (ys.min() ?? 0)
-    if ySpread < 0.25 {
-      return true
+    // Case A: side view — full body in horizontal band
+    if hipsVisible {
+      let ys: [Double] = anklesVisible
+        ? [shoulderY, hipY, ankleY]
+        : [shoulderY, hipY]
+      let ySpread = (ys.max() ?? 0) - (ys.min() ?? 0)
+      if ySpread < 0.25 {
+        return true
+      }
     }
 
-    // Case B: front-facing prone (e.g. pushup viewed head-on) — body extends
-    // away along Z, so y-spread is large. Fall back to upper-body geometry.
-    let le = _landmarks[13], re = _landmarks[14]
-    let lw = _landmarks[15], rw = _landmarks[16]
-    let upperBodyVisible = le.visibility > threshold && re.visibility > threshold
-                        && lw.visibility > threshold && rw.visibility > threshold
-    guard upperBodyVisible else { return false }
+    // Case B: front-facing prone — minimum signature is shoulders + at least
+    // one wrist. We do NOT require hips because in pushup framings hips are
+    // often occluded by the body itself.
+    guard oneWristVisible else { return false }
 
-    let wristY = (lw.y + rw.y) / 2
-    guard wristY > shoulderY + 0.03 else { return false }
-    guard shoulderWidth > 0.10 else { return false }
-    return true
+    let wristY = wristsVisible
+      ? (lw.y + rw.y) / 2
+      : max(lw.y, rw.y)  // whichever wrist we can see
+
+    // Geometry: wrists at or below shoulder line, torso reasonably wide.
+    // Tolerance loosened to handle deep DOWN phase where shoulders drop
+    // close to wrist level.
+    let handsLowerOrLevel = wristY > shoulderY - 0.08
+    let torsoFacing = shoulderWidth > 0.06
+
+    return handsLowerOrLevel && torsoFacing
 
   case .standingupright:
-    // Front-facing standing: user often crops hips/knees at close range.
-    // Use a tiered check based on what's visible.
     if hipsVisible {
       if kneesVisible {
         return shoulderY < hipY - 0.05
@@ -412,8 +422,7 @@ private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool {
       }
       return shoulderY < hipY - 0.05
     }
-    // Hips off-frame — accept if shoulders form a reasonable horizontal span,
-    // which means the person is upright and facing (or backing) the camera.
+    // Hips cropped (close-range front-facing) — accept based on shoulder span
     return shoulderWidth > 0.08
 
   case .seated:
@@ -423,7 +432,6 @@ private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool {
     if hipsVisible {
       return shoulderY < hipY - 0.05
     }
-    // Seated with hips out of frame is rare; fall back to upright shoulder span
     return shoulderWidth > 0.08
 
   case .sideplank:
