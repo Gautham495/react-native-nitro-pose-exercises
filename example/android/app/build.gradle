@@ -7,6 +7,8 @@ apply plugin: "com.facebook.react"
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
+
+    nodeExecutableAndArgs = ["/opt/homebrew/bin/node"]
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
     // root = file("../../")
@@ -75,7 +77,7 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
-    compileSdk rootProject.ext.compileSdkVersion
+    compileSdk 36
 
     namespace "nitroposeexercises.example"
     defaultConfig {
@@ -116,6 +118,4 @@ dependencies {
     } else {
         implementation jscFlavor
     }
-
-    implementation("com.google.mediapipe:tasks-vision:0.10.29")
 }

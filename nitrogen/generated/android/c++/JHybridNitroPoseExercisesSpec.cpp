@@ -91,6 +91,8 @@ namespace margelo::nitro::camera { class HybridFrameSpec; }
 #include <memory>
 #include <VisionCamera/HybridFrameSpec.hpp>
 #include <VisionCamera/JHybridFrameSpec.hpp>
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/JArrayBuffer.hpp>
 
 namespace margelo::nitro::nitroposeexercises {
 
@@ -329,9 +331,13 @@ namespace margelo::nitro::nitroposeexercises {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JExerciseConfig> /* config */)>("loadExercise");
     method(_javaPart, JExerciseConfig::fromCpp(config));
   }
-  void JHybridNitroPoseExercisesSpec::processFrame(const std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>& frame) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<margelo::nitro::camera::JHybridFrameSpec::JavaPart> /* frame */)>("processFrame");
+  void JHybridNitroPoseExercisesSpec::processFrameIOS(const std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>& frame) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<margelo::nitro::camera::JHybridFrameSpec::JavaPart> /* frame */)>("processFrameIOS");
     method(_javaPart, std::dynamic_pointer_cast<margelo::nitro::camera::JHybridFrameSpec>(frame)->getJavaPart());
+  }
+  void JHybridNitroPoseExercisesSpec::processFrameAndroid(const std::shared_ptr<ArrayBuffer>& buffer, double width, double height, double rotation) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JArrayBuffer::javaobject> /* buffer */, double /* width */, double /* height */, double /* rotation */)>("processFrameAndroid");
+    method(_javaPart, JArrayBuffer::wrap(buffer), width, height, rotation);
   }
   void JHybridNitroPoseExercisesSpec::startSession(double targetReps, double countdownSeconds) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(double /* targetReps */, double /* countdownSeconds */)>("startSession");

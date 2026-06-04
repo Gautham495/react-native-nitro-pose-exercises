@@ -39,7 +39,8 @@ namespace margelo::nitro::nitroposeexercises {
       prototype.registerHybridMethod("initialize", &HybridNitroPoseExercisesSpec::initialize);
       prototype.registerHybridMethod("release", &HybridNitroPoseExercisesSpec::release);
       prototype.registerHybridMethod("loadExercise", &HybridNitroPoseExercisesSpec::loadExercise);
-      prototype.registerHybridMethod("processFrame", &HybridNitroPoseExercisesSpec::processFrame);
+      prototype.registerHybridMethod("processFrameIOS", &HybridNitroPoseExercisesSpec::processFrameIOS);
+      prototype.registerHybridMethod("processFrameAndroid", &HybridNitroPoseExercisesSpec::processFrameAndroid);
       prototype.registerHybridMethod("startSession", &HybridNitroPoseExercisesSpec::startSession);
       prototype.registerHybridMethod("pauseSession", &HybridNitroPoseExercisesSpec::pauseSession);
       prototype.registerHybridMethod("resumeSession", &HybridNitroPoseExercisesSpec::resumeSession);

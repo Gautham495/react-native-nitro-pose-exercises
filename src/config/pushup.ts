@@ -9,57 +9,33 @@ import type { ExerciseConfig } from '../NitroPoseExercises.nitro';
 export const PUSHUP_CONFIG: ExerciseConfig = {
   name: 'Push-Up',
   type: 'rep',
-  postureFamily: 'horizontalProne',
-  visibilityThreshold: 0.2, // ← add
+  postureFamily: 'none',
+  visibilityThreshold: 0.3,
   cameraAngle: 'front',
   angles: [
-    {
-      name: 'leftElbow',
-      landmarkA: 11, // left shoulder
-      landmarkB: 13, // left elbow (vertex)
-      landmarkC: 15, // left wrist
-    },
-    {
-      name: 'rightElbow',
-      landmarkA: 12, // right shoulder
-      landmarkB: 14, // right elbow (vertex)
-      landmarkC: 16, // right wrist
-    },
-    {
-      name: 'leftHip',
-      landmarkA: 11, // left shoulder
-      landmarkB: 23, // left hip (vertex)
-      landmarkC: 27, // left ankle
-    },
-    {
-      name: 'rightHip',
-      landmarkA: 12, // right shoulder
-      landmarkB: 24, // right hip (vertex)
-      landmarkC: 28, // right ankle
-    },
+    { name: 'leftElbow', landmarkA: 11, landmarkB: 13, landmarkC: 15 },
+    { name: 'rightElbow', landmarkA: 12, landmarkB: 14, landmarkC: 16 },
   ],
   phases: [
-    { phase: 'up', angleName: 'leftElbow', minAngle: 150, maxAngle: 180 },
-    { phase: 'down', angleName: 'leftElbow', minAngle: 30, maxAngle: 90 },
+    // Calibrated for 2D-projected angles in front-facing portrait filming.
+    // Real anatomical 180° appears as ~140-150° due to perspective foreshortening.
+    { phase: 'up', angleName: 'leftElbow', minAngle: 130, maxAngle: 180 },
+    { phase: 'down', angleName: 'leftElbow', minAngle: 40, maxAngle: 80 },
   ],
   repSequence: ['up', 'down', 'up'],
   formRules: [
+    // Trigger when descending but stalled above true-down threshold
     {
-      name: 'hipSag',
-      message: 'Keep your hips up — your body should be a straight line',
-      severity: 'warning',
-      angleName: 'leftHip',
-      minAngle: 160, // body should be mostly straight
-      maxAngle: 180,
-    },
-    {
-      name: 'hipPike',
-      message: "Lower your hips — you're piking up",
-      severity: 'warning',
-      angleName: 'leftHip',
-      minAngle: 160,
-      maxAngle: 180,
+      name: 'shallowRep',
+      message: 'Go lower',
+      severity: 'info',
+      angleName: 'leftElbow',
+      minAngle: 80,
+      maxAngle: 130, // "limbo zone" — too low to be up, too high to be down
+      // Note: ideally this only fires when angle has stalled, not on the way down.
+      // If your formRule engine doesn't support velocity/stall detection,
+      // accept that it'll fire briefly during transitions too.
     },
   ],
-  holdDurationMs: 0, // not a hold exercise
+  holdDurationMs: 0,
 };

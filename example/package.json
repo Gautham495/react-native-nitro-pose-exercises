@@ -12,6 +12,7 @@
     "build:web": "vite build"
   },
   "dependencies": {
+    "@shopify/react-native-skia": "^2.6.4",
     "lucide-react-native": "^1.16.0",
     "react": "19.2.3",
     "react-native": "0.85.3",

@@ -121,8 +121,16 @@ interface NitroPoseExercises extends HybridObject<{
   // Session control
   readonly status: SessionStatus;
 
-  // Process a VisionCamera frame — called from frame processor worklet
-  processFrame(frame: Frame): void;
+  // iOS: zero-copy Vision path
+  processFrameIOS(frame: Frame): void;
+
+  // Android: pre-resized RGBA buffer from VisionCamera Resizer (Vulkan-accelerated)
+  processFrameAndroid(
+    buffer: ArrayBuffer,
+    width: number,
+    height: number,
+    rotation: number
+  ): void;
 
   // Callbacks (set from JS side)
   onRepComplete: ((data: RepData) => void) | undefined;

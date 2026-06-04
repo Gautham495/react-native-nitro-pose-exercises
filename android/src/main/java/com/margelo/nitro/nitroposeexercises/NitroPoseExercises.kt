@@ -1,22 +1,28 @@
 package com.margelo.nitro.nitroposeexercises
 
-import android.graphics.Bitmap
 import android.graphics.Matrix
-import android.media.Image
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseDetector
 import com.google.mlkit.vision.pose.PoseLandmark
 import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
-import com.margelo.nitro.camera.HybridFrameSpec
 import kotlin.math.acos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
+
+import android.media.Image
+import android.graphics.Bitmap
+import com.google.mlkit.vision.common.InputImage
+import com.margelo.nitro.core.ArrayBuffer
+import java.nio.ByteBuffer
+
+import java.nio.ByteOrder
+
+import com.margelo.nitro.camera.HybridFrameSpec
 
 @Keep
 @DoNotStrip
@@ -205,88 +211,97 @@ override fun isReady(): Boolean {
   // Frame Processing (ML Kit — async with cached results)
   // ═══════════════════════════════════════════════════════════
 
-override fun processFrame(frame: HybridFrameSpec) {
-    if (_status != SessionStatus.ACTIVE && _status != SessionStatus.COUNTDOWN) return
-    if (!isInitialized || poseDetector == null) return
-
-    frameCount++
-    if (frameCount % processEveryNFrames != 0) return
-
-    try {
-      val nativeBuffer = frame.getNativeBuffer()
-      val bitmap = FrameHelper.hardwareBufferToBitmap(nativeBuffer.pointer) ?: return
 
 
-  val rotation = rotationDegreesFromFrame(frame)
-  val inputImage = InputImage.fromBitmap(bitmap, rotation)
+override fun processFrameAndroid(buffer: ArrayBuffer, width: Double, height: Double, rotation: Double) {
+  if (_status != SessionStatus.ACTIVE && _status != SessionStatus.COUNTDOWN) return
+  if (!isInitialized || poseDetector == null) return
 
-      val imageWidth = bitmap.width.toDouble()
-      val imageHeight = bitmap.height.toDouble()
+  frameCount++
+  if (frameCount % processEveryNFrames != 0) return
 
-      poseDetector!!.process(inputImage)
-        .addOnSuccessListener { pose ->
-          val poseLandmarks = pose.allPoseLandmarks
+  val w = width.toInt()
+  val h = height.toInt()
+  val rot = rotation.toInt()
 
-          if (poseLandmarks.isNotEmpty()) {
-            if (poseWasLost) {
-              poseWasLost = false
-              onPoseRegained?.invoke()
-            }
+  try {
+    val rgb = buffer.getBuffer(false)
+    rgb.rewind()
 
-            val landmarkArray = Array(34) { Landmark(x = 0.0, y = 0.0, z = 0.0, visibility = 0.0) }
+    // RGB (3 bytes) -> ARGB_8888 (4 bytes, A=0xFF). Bitmap.Config.ARGB_8888 stores as RGBA in memory.
+    val pixelCount = w * h
+    val rgba = ByteBuffer.allocateDirect(pixelCount * 4).order(ByteOrder.nativeOrder())
+    for (i in 0 until pixelCount) {
+      val r = rgb.get()
+      val g = rgb.get()
+      val b = rgb.get()
+      rgba.put(r)
+      rgba.put(g)
+      rgba.put(b)
+      rgba.put(0xFF.toByte())
+    }
+    rgba.rewind()
 
-            for (poseLandmark in poseLandmarks) {
-              val mediaPipeIndex = mlKitToMediaPipeMap[poseLandmark.landmarkType] ?: continue
-              if (mediaPipeIndex >= 34) continue
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    bitmap.copyPixelsFromBuffer(rgba)
 
-              landmarkArray[mediaPipeIndex] = Landmark(
-                x = poseLandmark.position.x.toDouble() / imageWidth,
-                y = poseLandmark.position.y.toDouble() / imageHeight,
-                z = poseLandmark.position3D.z.toDouble(),
-                visibility = poseLandmark.inFrameLikelihood.toDouble()
-              )
-            }
+    val inputImage = InputImage.fromBitmap(bitmap, rot)
 
-            synchronized(landmarkLock) {
-              cachedLandmarks = landmarkArray
-            }
-          } else {
-            if (!poseWasLost) {
-              poseWasLost = true
-              onPoseLost?.invoke()
-            }
-            synchronized(landmarkLock) {
-              cachedLandmarks = emptyArray()
-            }
+    val rotated = rot == 90 || rot == 270
+    val imageWidth = (if (rotated) h else w).toDouble()
+    val imageHeight = (if (rotated) w else h).toDouble()
+
+    poseDetector!!.process(inputImage)
+      .addOnSuccessListener { pose ->
+        val poseLandmarks = pose.allPoseLandmarks
+
+        if (poseLandmarks.isNotEmpty()) {
+          if (poseWasLost) {
+            poseWasLost = false
+            onPoseRegained?.invoke()
           }
 
-          bitmap.recycle()
+          val landmarkArray = Array(34) { Landmark(x = 0.0, y = 0.0, z = 0.0, visibility = 0.0) }
+
+          for (poseLandmark in poseLandmarks) {
+            val mediaPipeIndex = mlKitToMediaPipeMap[poseLandmark.landmarkType] ?: continue
+            if (mediaPipeIndex >= 34) continue
+
+            landmarkArray[mediaPipeIndex] = Landmark(
+              x = (poseLandmark.position3D.x / imageWidth).coerceIn(0.0, 1.0),
+              y = (poseLandmark.position3D.y / imageHeight).coerceIn(0.0, 1.0),
+              z = poseLandmark.position3D.z.toDouble(),
+              visibility = poseLandmark.inFrameLikelihood.toDouble()
+            )
+          }
+
+          synchronized(landmarkLock) {
+            cachedLandmarks = landmarkArray
+            _landmarks = landmarkArray
+          }
+
+          processExerciseLogic()  // your actual method name
+        } else {
+          if (!poseWasLost) {
+            poseWasLost = true
+            onPoseLost?.invoke()
+          }
         }
-        .addOnFailureListener { e ->
-          println("[PoseExercise] ML Kit error: ${e.message}")
-          bitmap.recycle()
-        }
-
-      // Use cached landmarks from previous frame
-      val currentLandmarks: Array<Landmark>
-      synchronized(landmarkLock) {
-        currentLandmarks = cachedLandmarks.copyOf()
       }
-
-      _landmarks = currentLandmarks
-
-      if (currentLandmarks.isNotEmpty() && _status == SessionStatus.ACTIVE) {
-        processExerciseLogic()
+      .addOnFailureListener { e ->
+        println("[PoseExercise] ML Kit failure: ${e.message}")
       }
-
-    } catch (e: Exception) {
-      println("[PoseExercise] Frame processing error: ${e.message}")
-    }
+      .addOnCompleteListener {
+        bitmap.recycle()
+      }
+  } catch (e: Exception) {
+    println("[PoseExercise] processFrameAndroid error: ${e.message}")
   }
+}
 
-  // ═══════════════════════════════════════════════════════════
-  // Exercise Logic Engine
-  // ═══════════════════════════════════════════════════════════
+override fun processFrameIOS(frame: HybridFrameSpec) {
+  // no-op on Android
+}
 
 private fun processExerciseLogic() {
   val config = exerciseConfig ?: return
@@ -674,4 +689,4 @@ private fun isPostureValid(family: PostureFamily, threshold: Double): Boolean {
     }
     PostureFamily.NONE -> true
   }
-}
+}}

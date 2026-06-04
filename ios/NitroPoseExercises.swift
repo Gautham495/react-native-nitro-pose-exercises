@@ -178,7 +178,7 @@ private static func cgOrientation(orientation: CameraOrientation, isMirrored: Bo
   // MARK: - Frame Processing (Apple Vision)
   // ═══════════════════════════════════════════════════════════
 
-  func processFrame(frame: any HybridFrameSpec) throws {
+func processFrameIOS(frame: any HybridFrameSpec) throws {
     guard _status == .active || _status == .countdown else { return }
 
     guard isInitialized else { return }
@@ -243,8 +243,6 @@ private static func cgOrientation(orientation: CameraOrientation, isMirrored: Bo
             visibility: confidence
           )
 
-          // Debug logging — uncomment to verify mapping
-          // print("[PoseExercise] \(jointName.rawValue.rawValue) → index \(mediaPipeIndex): x=\(String(format: "%.3f", point.location.x)) y=\(String(format: "%.3f", 1.0 - Double(point.location.y))) conf=\(String(format: "%.2f", confidence))")
 
         } catch {
           // Joint not detected — leave as zero visibility
@@ -263,6 +261,9 @@ private static func cgOrientation(orientation: CameraOrientation, isMirrored: Bo
     }
   }
 
+func processFrameAndroid(buffer: ArrayBuffer, width: Double, height: Double, rotation: Double) {
+  // no-op on iOS
+}
   // ═══════════════════════════════════════════════════════════
   // MARK: - Exercise Logic Engine
   // ═══════════════════════════════════════════════════════════
@@ -369,12 +370,30 @@ private func isPostureValid(family: PostureFamily, threshold: Double) -> Bool {
   let ankleY = anklesVisible ? (la.y + ra.y) / 2 : kneeY
 
   switch family {
-  case .horizontalprone, .supine:
-    // Horizontal body — torso, plus ankles if visible
-    let ys: [Double] = anklesVisible
-      ? [shoulderY, hipY, ankleY]
-      : [shoulderY, hipY]
-    return ((ys.max() ?? 0) - (ys.min() ?? 0)) < 0.25
+case .horizontalprone, .supine:
+  // Case A: side view — shoulders, hips, ankles in horizontal band
+  let ys: [Double] = anklesVisible
+    ? [shoulderY, hipY, ankleY]
+    : [shoulderY, hipY]
+  let ySpread = (ys.max() ?? 0) - (ys.min() ?? 0)
+  if ySpread < 0.25 {
+    return true
+  }
+
+  // Case B: front-facing — body extends away from camera along Z.
+  // Y-spread is large (head close, feet far), so check upper-body geometry.
+  let le = _landmarks[13], re = _landmarks[14]
+  let lw = _landmarks[15], rw = _landmarks[16]
+  let upperBodyVisible = le.visibility > threshold && re.visibility > threshold
+                      && lw.visibility > threshold && rw.visibility > threshold
+  guard upperBodyVisible else { return false }
+
+  let wristY = (lw.y + rw.y) / 2
+  let shoulderWidth = abs(ls.x - rs.x)
+  guard wristY > shoulderY + 0.03 else { return false }
+  guard shoulderWidth > 0.10 else { return false }
+
+  return true
 
   case .standingupright:
     // Torso vertical (shoulders above hips). If knees visible, check chain.

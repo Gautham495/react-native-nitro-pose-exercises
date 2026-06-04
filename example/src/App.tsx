@@ -4,7 +4,7 @@ import {
   useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
-import { SwitchCamera } from 'lucide-react-native';
+// import { SwitchCamera } from 'lucide-react-native';
 import {
   nitroPoseExercises,
   // PUSHUP_CONFIG,
@@ -14,8 +14,8 @@ import {
   type ExercisePhase,
   BICEP_CURL_CONFIG,
 } from 'react-native-nitro-pose-exercises';
-// import { NormalCameraView } from './normal';
 import { NormalCameraView } from './normal';
+// import { NormalCameraView } from './skia';
 import { styles } from './camera-styles';
 import { getFramingStatus } from './framing';
 
@@ -221,7 +221,6 @@ export default function App() {
   return (
     <View style={styles.container}>
       {/* Camera */}
-      {/* <NormalCameraView device={device} isActive={appPhase !== 'results'} /> */}
       <NormalCameraView device={device} isActive={appPhase !== 'results'} />
 
       {/* Overlay UI */}
@@ -230,7 +229,7 @@ export default function App() {
         {appPhase !== 'results' && (
           <View style={styles.topButtons}>
             <TouchableOpacity style={styles.iconButton} onPress={toggleCamera}>
-              <SwitchCamera color="#fff" size={28} />
+              {/* <SwitchCamera color="#fff" size={28} /> */}
             </TouchableOpacity>
           </View>
         )}

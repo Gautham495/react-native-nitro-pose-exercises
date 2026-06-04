@@ -29,7 +29,8 @@ public protocol HybridNitroPoseExercisesSpec_protocol: HybridObject {
   func initialize(modelPath: String) throws -> Promise<Void>
   func release() throws -> Void
   func loadExercise(config: ExerciseConfig) throws -> Void
-  func processFrame(frame: (any HybridFrameSpec)) throws -> Void
+  func processFrameIOS(frame: (any HybridFrameSpec)) throws -> Void
+  func processFrameAndroid(buffer: ArrayBuffer, width: Double, height: Double, rotation: Double) throws -> Void
   func startSession(targetReps: Double, countdownSeconds: Double) throws -> Void
   func pauseSession() throws -> Void
   func resumeSession() throws -> Void
