@@ -4,6 +4,7 @@ import com.margelo.nitro.camera.HybridFrameSpec
 import com.margelo.nitro.camera.public.NativeFrame
 import com.google.android.gms.tasks.Tasks
 import java.util.concurrent.TimeUnit
+import androidx.camera.core.ImageProxy
 
 // import android.graphics.Matrix
 import androidx.annotation.Keep
@@ -213,10 +214,6 @@ override fun isReady(): Boolean {
   // ═══════════════════════════════════════════════════════════
   // Frame Processing (ML Kit — async with cached results)
   // ═══════════════════════════════════════════════════════════
-
-// Reusable scratch — allocated once, never GC'd per frame
-@Volatile private var lastProcessTime: Long = 0L
-private val minIntervalMs: Long = 66L  // ~15fps cap; bump down to 33 for ~30fps
 
 // Time-based throttle — more reliable than frame-count under variable FPS
 @Volatile private var lastProcessTime: Long = 0L
