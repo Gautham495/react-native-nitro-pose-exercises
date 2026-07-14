@@ -17,7 +17,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "Landmark" and the the Kotlin data class "Landmark".
+   * The C++ JNI bridge between the C++ struct "Landmark" and the Kotlin data class "Landmark".
    */
   struct JLandmark final: public jni::JavaClass<JLandmark> {
   public:

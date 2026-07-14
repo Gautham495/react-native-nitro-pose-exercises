@@ -34,7 +34,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "ExerciseConfig" and the the Kotlin data class "ExerciseConfig".
+   * The C++ JNI bridge between the C++ struct "ExerciseConfig" and the Kotlin data class "ExerciseConfig".
    */
   struct JExerciseConfig final: public jni::JavaClass<JExerciseConfig> {
   public:

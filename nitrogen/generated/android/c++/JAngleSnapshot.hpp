@@ -17,7 +17,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "AngleSnapshot" and the the Kotlin data class "AngleSnapshot".
+   * The C++ JNI bridge between the C++ struct "AngleSnapshot" and the Kotlin data class "AngleSnapshot".
    */
   struct JAngleSnapshot final: public jni::JavaClass<JAngleSnapshot> {
   public:

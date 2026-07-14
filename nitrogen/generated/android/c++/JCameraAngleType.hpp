@@ -15,7 +15,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ enum "CameraAngleType" and the the Kotlin enum "CameraAngleType".
+   * The C++ JNI bridge between the C++ enum "CameraAngleType" and the Kotlin enum "CameraAngleType".
    */
   struct JCameraAngleType final: public jni::JavaClass<JCameraAngleType> {
   public:

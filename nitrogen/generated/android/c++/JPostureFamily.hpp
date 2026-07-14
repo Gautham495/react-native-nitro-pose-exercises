@@ -15,7 +15,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ enum "PostureFamily" and the the Kotlin enum "PostureFamily".
+   * The C++ JNI bridge between the C++ enum "PostureFamily" and the Kotlin enum "PostureFamily".
    */
   struct JPostureFamily final: public jni::JavaClass<JPostureFamily> {
   public:

@@ -19,7 +19,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "FormRule" and the the Kotlin data class "FormRule".
+   * The C++ JNI bridge between the C++ struct "FormRule" and the Kotlin data class "FormRule".
    */
   struct JFormRule final: public jni::JavaClass<JFormRule> {
   public:

@@ -19,7 +19,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "PhaseThreshold" and the the Kotlin data class "PhaseThreshold".
+   * The C++ JNI bridge between the C++ struct "PhaseThreshold" and the Kotlin data class "PhaseThreshold".
    */
   struct JPhaseThreshold final: public jni::JavaClass<JPhaseThreshold> {
   public:

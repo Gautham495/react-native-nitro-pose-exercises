@@ -24,7 +24,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "SessionResult" and the the Kotlin data class "SessionResult".
+   * The C++ JNI bridge between the C++ struct "SessionResult" and the Kotlin data class "SessionResult".
    */
   struct JSessionResult final: public jni::JavaClass<JSessionResult> {
   public:

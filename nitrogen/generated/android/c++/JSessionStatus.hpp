@@ -15,7 +15,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ enum "SessionStatus" and the the Kotlin enum "SessionStatus".
+   * The C++ JNI bridge between the C++ enum "SessionStatus" and the Kotlin enum "SessionStatus".
    */
   struct JSessionStatus final: public jni::JavaClass<JSessionStatus> {
   public:

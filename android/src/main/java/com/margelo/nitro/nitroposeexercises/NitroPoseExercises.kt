@@ -359,7 +359,7 @@ private fun processExerciseLogic() {
     angleSnapshots.add(AngleSnapshot(name = angleDef.name, value = angle))
   }
 
-  repAngleSnapshots = angleSnapshots
+  repAngleSnapshots = angleSnapshots.toTypedArray()
 
   val detectedPhase = determinePhase(currentAngles, config)
 
@@ -419,69 +419,68 @@ private fun processExerciseLogic() {
   // Rep Counting State Machine
   // ═══════════════════════════════════════════════════════════
 
-  private fun handlePhaseTransition(newPhase: ExercisePhase, config: ExerciseConfig) {
-    if (config.type != ExerciseType.REP) return
+private fun handlePhaseTransition(
+  previousPhase: ExercisePhase,
+  newPhase: ExercisePhase,
+  config: ExerciseConfig
+) {
+  if (config.type != ExerciseType.REP) return
 
-    phaseHistory.add(newPhase)
+  phaseHistory.add(newPhase)
 
-    val repSeq = config.repSequence
-    if (phaseHistory.size >= repSeq.size) {
-      val tail = phaseHistory.takeLast(repSeq.size)
+  val repSeq = config.repSequence
+  if (phaseHistory.size >= repSeq.size) {
+    val tail = phaseHistory.takeLast(repSeq.size)
 
-      if (tail == repSeq.toList()) {
-        val now = System.currentTimeMillis()
-        val repDuration = (now - repStartTime).toDouble()
+    if (tail == repSeq.toList()) {
+      val now = System.currentTimeMillis()
+      val repDuration = (now - repStartTime).toDouble()
 
-        // Minimum 800ms per rep
-        if (repDuration < 800) {
-          phaseHistory.clear()
-          phaseHistory.add(newPhase)
-          return
-        }
+      if (repDuration < 800) {
+        phaseHistory = mutableListOf(newPhase)
+        return
+      }
 
-        // Don't count rep if form is terrible
-        if (repFormScore <= 30) {
-          onFormFeedback?.invoke(FormFeedback(
-            ruleName = "poorForm",
-            message = "Fix your form before continuing",
-            severity = FormSeverity.ERROR
-          ))
-          repFormScore = 100.0
-          phaseHistory.clear()
-          phaseHistory.add(newPhase)
-          return
-        }
-
-        _repCount += 1.0
-
-        val repData = RepData(
-          repNumber = _repCount,
-          durationMs = repDuration,
-          formScore = repFormScore,
-          angles = repAngleSnapshots
-        )
-
-        allRepDurations.add(repDuration)
-        allRepFormScores.add(repFormScore)
-
-        onRepComplete?.invoke(repData)
-
-        repStartTime = now
+      if (repFormScore <= 30) {
+        onFormFeedback?.invoke(FormFeedback(
+          ruleName = "poorForm",
+          message = "Fix your form before continuing",
+          severity = FormSeverity.ERROR
+        ))
         repFormScore = 100.0
-        phaseHistory.clear()
-        phaseHistory.add(newPhase)
+        phaseHistory = mutableListOf(newPhase)
+        return
+      }
 
-        if (targetReps > 0 && _repCount >= targetReps) {
-          completeSession()
-        }
+      _repCount += 1.0
+
+      val repData = RepData(
+        repNumber = _repCount,
+        durationMs = repDuration,
+        formScore = repFormScore,
+        angles = repAngleSnapshots
+      )
+
+      allRepDurations.add(repDuration)
+      allRepFormScores.add(repFormScore)
+
+      onRepComplete?.invoke(repData)
+
+      repStartTime = now
+      repFormScore = 100.0
+      phaseHistory = mutableListOf(newPhase)
+
+      if (targetReps > 0 && _repCount >= targetReps) {
+        completeSession()
       }
     }
-
-    val maxHistory = repSeq.size * 2
-    if (phaseHistory.size > maxHistory) {
-      phaseHistory = phaseHistory.takeLast(maxHistory).toMutableList()
-    }
   }
+
+  val maxHistory = repSeq.size * 2
+  if (phaseHistory.size > maxHistory) {
+    phaseHistory = phaseHistory.takeLast(maxHistory).toMutableList()
+  }
+}
 
   // ═══════════════════════════════════════════════════════════
   // Form Validation

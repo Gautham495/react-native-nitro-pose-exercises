@@ -15,7 +15,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ enum "FormSeverity" and the the Kotlin enum "FormSeverity".
+   * The C++ JNI bridge between the C++ enum "FormSeverity" and the Kotlin enum "FormSeverity".
    */
   struct JFormSeverity final: public jni::JavaClass<JFormSeverity> {
   public:

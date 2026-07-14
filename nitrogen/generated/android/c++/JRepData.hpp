@@ -20,7 +20,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "RepData" and the the Kotlin data class "RepData".
+   * The C++ JNI bridge between the C++ struct "RepData" and the Kotlin data class "RepData".
    */
   struct JRepData final: public jni::JavaClass<JRepData> {
   public:

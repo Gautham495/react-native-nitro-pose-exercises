@@ -15,7 +15,7 @@ namespace margelo::nitro::nitroposeexercises {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ enum "ExerciseType" and the the Kotlin enum "ExerciseType".
+   * The C++ JNI bridge between the C++ enum "ExerciseType" and the Kotlin enum "ExerciseType".
    */
   struct JExerciseType final: public jni::JavaClass<JExerciseType> {
   public:
